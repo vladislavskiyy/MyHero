@@ -1,0 +1,12 @@
+{
+    "cmake.sourceDirectory": "E:/VKR/flutter_application_1/windows",
+    
+  "files.exclude": {
+    "**/windows/flutter/ephemeral": true
+  },
+  "search.exclude": {
+    "**/windows/flutter/ephemeral": true
+  }
+
+
+}

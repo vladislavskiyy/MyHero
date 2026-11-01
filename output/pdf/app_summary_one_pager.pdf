@@ -1,0 +1,89 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 4460 >>
+stream
+BT /F2 21 Tf 1 0 0 1 42.00 799.89 Tm (App Summary) Tj ET
+42.00 775.89 511.28 1 re S
+BT /F1 10.5 Tf 1 0 0 1 42.00 757.89 Tm (This Flutter app is a personal productivity planner that combines tasks, habits,) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 42.00 743.89 Tm (journaling, calendar planning, and profile progression in one mobile-first interface.) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 42.00 727.89 Tm (It stores app data locally with Hive, includes local notifications, and exposes a) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 42.00 713.89 Tm (lightweight in-app AI companion with scripted guidance flows.) Tj ET
+BT /F2 13 Tf 1 0 0 1 42.00 697.89 Tm (Who It Is For) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 42.00 679.89 Tm (Primary persona inferred from repo workflows: an individual user managing personal) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 42.00 665.89 Tm (tasks, daily routines, reflections, and progress on a single device.) Tj ET
+BT /F2 13 Tf 1 0 0 1 42.00 649.89 Tm (What It Does) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 631.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 631.89 Tm (Captures tasks quickly in Inbox, then organizes them into multiple task lists.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 617.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 617.89 Tm (Shows dated tasks in a calendar view with pending/completed breakdowns.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 603.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 603.89 Tm (Tracks habits with streaks, lives, daily completion, and XP/coin rewards.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 589.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 589.89 Tm (Stores journal entries with text plus optional image attachments.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 575.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 575.89 Tm (Builds a daily plan by selecting tasks that fit available minutes and urgency.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 561.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 561.89 Tm (Displays profile stats, achievements, productivity charts, and an in-app reward) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 547.89 Tm (store.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 533.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 533.89 Tm (Provides a local AI companion chat with preset prompts for planning, motivation,) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 519.89 Tm (and reflection.) Tj ET
+BT /F2 13 Tf 1 0 0 1 42.00 505.89 Tm (How It Works) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 487.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 487.89 Tm (UI layer: Flutter Material app with bottom navigation for Tools, Calendar, AI, and) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 473.89 Tm (Profile.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 459.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 459.89 Tm (State layer: `AppState` \(`ChangeNotifier` via Provider\) owns lists, habits,) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 445.89 Tm (journal entries, achievements, XP, coins, and scheduling logic.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 431.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 431.89 Tm (Persistence: Hive boxes store auth/session, task lists, habits, journal entries,) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 417.89 Tm (achievements, and settings; main bootstraps Hive and registers adapters.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 403.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 403.89 Tm (Security: a Hive AES key is generated/read from `flutter_secure_storage`;) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 389.89 Tm (passwords are hashed with SHA-256 in `AuthService`.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 375.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 375.89 Tm (Services: `NotificationService` initializes local notifications; no active remote) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 361.89 Tm (API/data service integration was found in repo code.) Tj ET
+BT /F2 10 Tf 1 0 0 1 42.00 347.89 Tm (Backend/API: Not found in repo.) Tj ET
+BT /F2 13 Tf 1 0 0 1 42.00 333.89 Tm (How To Run) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 315.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 315.89 Tm (Install Flutter SDK compatible with Dart `^3.7.2`.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 301.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 301.89 Tm (From repo root, run: `flutter pub get`.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 287.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 287.89 Tm (Start the app on a target device/emulator: `flutter run`.) Tj ET
+BT /F2 10 Tf 1 0 0 1 44.00 273.89 Tm (-) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 273.89 Tm (Platform folders for Android, iOS, Linux, macOS, Web, and Windows are present in) Tj ET
+BT /F1 10.5 Tf 1 0 0 1 56.00 259.89 Tm (the repo.) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000263 00000 n 
+0000000333 00000 n 
+0000000408 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+4919
+%%EOF
