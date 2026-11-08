@@ -10,12 +10,16 @@ import '../theme/app_theme.dart';
 
 class JournalDetailPage extends StatelessWidget {
   final JournalEntry entry;
-  const JournalDetailPage({Key? key, required this.entry}) : super(key: key);
+  const JournalDetailPage({super.key, required this.entry});
 
   @override
   Widget build(BuildContext context) {
-    final title = entry.title.trim().isEmpty ? 'Без названия' : entry.title.trim();
-    final content = entry.content.trim().isEmpty ? '— нет содержимого —' : entry.content.trim();
+    final title = entry.title.trim().isEmpty
+        ? 'Без названия'
+        : entry.title.trim();
+    final content = entry.content.trim().isEmpty
+        ? '— нет содержимого —'
+        : entry.content.trim();
 
     return Scaffold(
       appBar: const CustomAppBar(
@@ -46,16 +50,22 @@ class JournalDetailPage extends StatelessWidget {
                         color: AppColors.accent.withAlpha((0.12 * 255).round()),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.accent.withAlpha((0.18 * 255).round()),
+                          color: AppColors.accent.withAlpha(
+                            (0.18 * 255).round(),
+                          ),
                         ),
                       ),
-                      child: const Icon(Icons.book_rounded, color: AppColors.accent),
+                      child: const Icon(
+                        Icons.book_rounded,
+                        color: AppColors.accent,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         title,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(
                               fontWeight: FontWeight.w900,
                               color: AppColors.textPrimary,
                               height: 1.15,
@@ -85,7 +95,8 @@ class JournalDetailPage extends StatelessWidget {
                         padding: const EdgeInsets.all(16),
                         child: Text(
                           content,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
                                 color: AppColors.textPrimary,
                                 height: 1.5,
                                 fontWeight: FontWeight.w500,
@@ -108,7 +119,8 @@ class JournalDetailPage extends StatelessWidget {
                             children: [
                               Text(
                                 'Вложения',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
                                       fontWeight: FontWeight.w900,
                                       color: AppColors.textPrimary,
                                     ),
@@ -120,7 +132,8 @@ class JournalDetailPage extends StatelessWidget {
                                   scrollDirection: Axis.horizontal,
                                   physics: const BouncingScrollPhysics(),
                                   itemCount: entry.imagePaths.length,
-                                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 10),
                                   itemBuilder: (ctx, i) {
                                     final path = entry.imagePaths[i];
                                     return _ImageThumb(path: path);
@@ -143,14 +156,18 @@ class JournalDetailPage extends StatelessWidget {
                 onPressed: () => showJournalDialog(context, entry: entry),
                 icon: const Icon(Icons.edit_rounded),
                 label: const Text('Редактировать'),
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
               ),
               const SizedBox(height: 10),
               OutlinedButton.icon(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back_rounded),
                 label: const Text('Назад'),
-                style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
               ),
             ],
           ),

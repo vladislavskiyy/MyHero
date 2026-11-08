@@ -4,6 +4,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/task.dart';
+import '../services/task_ai_service.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_app_bar.dart';
@@ -23,11 +25,8 @@ class _ChatMessage {
   final String text;
   final DateTime ts;
 
-  _ChatMessage({
-    required this.sender,
-    required this.text,
-    DateTime? ts,
-  }) : ts = ts ?? DateTime.now();
+  _ChatMessage({required this.sender, required this.text, DateTime? ts})
+    : ts = ts ?? DateTime.now();
 }
 
 class _AiCompanionPageState extends State<AiCompanionPage> {
@@ -38,7 +37,7 @@ class _AiCompanionPageState extends State<AiCompanionPage> {
     _ChatMessage(
       sender: _Sender.ai,
       text:
-          'Привет! Я твой AI-компаньон 🙂\nМогу помочь: распланировать день, разбить задачу, подобрать привычки и подвести итоги.',
+          'Привет! Я Nomi 🙂 Помогу распланировать день, разбить задачу на шаги, расставить приоритеты, подвести итоги или просто обсудить планирование.',
     ),
   ];
 
@@ -53,7 +52,7 @@ class _AiCompanionPageState extends State<AiCompanionPage> {
 
   Future<void> _send(String raw) async {
     final text = raw.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isTyping) return;
 
     setState(() {
       _messages.add(_ChatMessage(sender: _Sender.user, text: text));
@@ -62,17 +61,109 @@ class _AiCompanionPageState extends State<AiCompanionPage> {
     _ctrl.clear();
     _scrollToBottomSoon();
 
-    // имитация "печатает"
-    await Future<void>.delayed(const Duration(milliseconds: 450));
+    final previousMessages = _messages
+        .sublist(0, _messages.length - 1)
+        .reversed
+        .take(8)
+        .toList()
+        .reversed
+        .map(
+          (message) =>
+              '${message.sender == _Sender.user ? 'Пользователь' : 'Nomi'}: ${message.text}',
+        )
+        .toList();
 
-    final reply = _generateReply(text);
-    if (!mounted) return;
+    try {
+      final state = context.read<AppState>();
+      final reply = await TaskAiService().replyToCompanion(
+        message: text,
+        taskContext: _buildTaskContext(state),
+        history: previousMessages,
+      );
+      if (!mounted) return;
+      setState(
+        () => _messages.add(_ChatMessage(sender: _Sender.ai, text: reply)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _messages.add(
+          _ChatMessage(
+            sender: _Sender.ai,
+            text:
+                'Не удалось получить ответ от Gemini. Проверьте подключение и настройки Firebase App Check.\nПодробности: $error',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isTyping = false);
+        _scrollToBottomSoon();
+      }
+    }
+  }
 
-    setState(() {
-      _messages.add(_ChatMessage(sender: _Sender.ai, text: reply));
-      _isTyping = false;
-    });
-    _scrollToBottomSoon();
+  String _buildTaskContext(AppState state) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final entries = [
+      for (final list in state.lists)
+        for (final task in list.tasks) (listName: list.name, task: task),
+    ];
+    final pending = entries.where((entry) => !entry.task.isDone).toList()
+      ..sort((a, b) {
+        final aDate = a.task.deadline ?? a.task.date ?? DateTime(9999);
+        final bDate = b.task.deadline ?? b.task.date ?? DateTime(9999);
+        return aDate.compareTo(bDate);
+      });
+    final todayTasks = entries.where((entry) {
+      final task = entry.task;
+      return task.appearsOn(today) ||
+          (task.deadline != null && DateUtils.isSameDay(task.deadline, today));
+    }).toList();
+    Map<String, dynamic>? todayPlan;
+    for (final plan in state.savedPlans) {
+      final date = DateTime.tryParse(plan['date'] as String? ?? '');
+      if (date != null && DateUtils.isSameDay(date, today)) {
+        todayPlan = plan;
+        break;
+      }
+    }
+
+    String formatTask(({String listName, Task task}) entry) {
+      final task = entry.task;
+      final due = task.deadline ?? task.date;
+      final dueText = due == null
+          ? 'без срока'
+          : '${due.day.toString().padLeft(2, '0')}.${due.month.toString().padLeft(2, '0')}';
+      final duration = task.durationMinutes ?? task.estimatedDurationMinutes;
+      return '- ${task.title} [${entry.listName}; '
+          '${task.isDone ? 'выполнена' : 'не выполнена'}; срок: $dueText; '
+          'приоритет: ${task.taskPriority.name}; '
+          'оценка: ${duration == null ? 'нет' : '$duration мин'}]';
+    }
+
+    final lines = <String>[
+      'Дата: ${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}.',
+      'Всего задач: ${entries.length}; выполнено всего: ${entries.where((entry) => entry.task.isDone).length}; осталось: ${pending.length}.',
+      if (todayPlan != null)
+        'В сохранённом плане на сегодня доступно ${todayPlan['availableMinutes']} минут.'
+      else
+        'Сохранённое доступное время на сегодня не задано.',
+      'Задачи на сегодня и их статус:',
+      if (todayTasks.isEmpty)
+        '- Нет задач, назначенных на сегодня.'
+      else
+        ...todayTasks.take(20).map(formatTask),
+      'Ближайшие невыполненные задачи:',
+      if (pending.isEmpty)
+        '- Нет невыполненных задач.'
+      else
+        ...pending.take(30).map(formatTask),
+      'Примечание: приложение не хранит время фактического завершения задачи; '
+          'статус выполнения известен, но нельзя достоверно определить, когда именно задача была завершена.',
+    ];
+    return lines.join('\n');
   }
 
   void _scrollToBottomSoon() {
@@ -85,25 +176,6 @@ class _AiCompanionPageState extends State<AiCompanionPage> {
         curve: Curves.easeOut,
       );
     });
-  }
-
-  String _generateReply(String input) {
-    final s = input.toLowerCase();
-
-    if (s.contains('план') || s.contains('день')) {
-      return 'Ок, сделаем план на день.\n\n1) Назови 3 главные задачи.\n2) Сколько времени у тебя сегодня (в минутах)?\n3) Есть ли жёсткие дедлайны/встречи?';
-    }
-    if (s.contains('разбей') || s.contains('декомпоз') || s.contains('задач')) {
-      return 'Давай декомпозируем.\n\nНапиши:\n• цель задачи\n• дедлайн\n• что уже готово\nИ я разложу на шаги + дам оценку времени.';
-    }
-    if (s.contains('мотивац') || s.contains('лень') || s.contains('не хочу')) {
-      return 'Понял. Давай мягко вернём мотивацию.\n\nВыбери вариант:\nA) 5 минут “разогрев”\nB) 1 маленький шаг прямо сейчас\nC) убрать препятствие (что мешает?)';
-    }
-    if (s.contains('итоги') || s.contains('рефлекс') || s.contains('дневник')) {
-      return 'Давай подведём итоги дня.\n\nОтветь коротко:\n1) Что получилось?\n2) Что мешало?\n3) 1 улучшение на завтра?';
-    }
-
-    return 'Ок 🙂\nСкажи, что именно хочешь получить: план, декомпозицию, мотивацию или итоги?';
   }
 
   @override
@@ -134,8 +206,16 @@ class _AiCompanionPageState extends State<AiCompanionPage> {
 
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _QuickActions(
-                        onTap: (t) => _send(t),
+                      child: _QuickActions(onTap: (t) => _send(t)),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Text(
+                        'Для ответа Gemini получит ваше сообщение, названия списков и задач, их статусы, сроки и оценки. Задачи и планы не меняются автоматически.',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -168,6 +248,7 @@ class _AiCompanionPageState extends State<AiCompanionPage> {
                       child: _Composer(
                         controller: _ctrl,
                         onSend: _send,
+                        enabled: !_isTyping,
                       ),
                     ),
                   ],
@@ -259,9 +340,15 @@ class _MiniPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+          ),
           const SizedBox(width: 6),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5),
+          ),
         ],
       ),
     );
@@ -277,7 +364,7 @@ class _QuickActions extends StatelessWidget {
     final items = <String>[
       'Составь план на день',
       'Разбей задачу на шаги',
-      'Нужна мотивация',
+      'Что важнее сделать?',
       'Подвести итоги дня',
     ];
 
@@ -325,7 +412,9 @@ class _ChatBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           Flexible(
             child: Container(
@@ -416,10 +505,12 @@ class _TypingBubbleState extends State<_TypingBubble> {
 class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final Future<void> Function(String) onSend;
+  final bool enabled;
 
   const _Composer({
     required this.controller,
     required this.onSend,
+    required this.enabled,
   });
 
   @override
@@ -441,6 +532,7 @@ class _Composer extends StatelessWidget {
               maxLines: 5,
               textInputAction: TextInputAction.send,
               onSubmitted: (v) => onSend(v),
+              enabled: enabled,
               decoration: const InputDecoration(
                 hintText: 'Напиши сообщение…',
                 border: InputBorder.none,
@@ -458,7 +550,7 @@ class _Composer extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              onPressed: () => onSend(controller.text),
+              onPressed: enabled ? () => onSend(controller.text) : null,
               child: const Icon(Icons.send_rounded, size: 18),
             ),
           ),

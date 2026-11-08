@@ -23,11 +23,11 @@ class TaskList extends HiveObject {
     required this.name,
     List<Task>? tasks,
     Color? color,
-  })  : colorValue = color?.value ?? 0xFFFFFFFF, 
-        tasks = tasks ?? [];
+  }) : colorValue = color?.toARGB32() ?? 0xFFFFFFFF,
+       tasks = tasks ?? [];
 
   Color get color => Color(colorValue);
-  set color(Color c) => colorValue = c.value;
+  set color(Color c) => colorValue = c.toARGB32();
 
   factory TaskList.fromMap(Map<String, dynamic> map) {
     return TaskList(

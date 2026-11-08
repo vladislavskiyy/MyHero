@@ -12,7 +12,7 @@ import 'journal_detail_page.dart';
 
 class JournalPage extends StatelessWidget {
   static const routeName = '/journal';
-  const JournalPage({Key? key}) : super(key: key);
+  const JournalPage({super.key});
 
   String _safeTitle(JournalEntry e) {
     final t = e.title.trim();
@@ -68,7 +68,10 @@ class JournalPage extends StatelessWidget {
                           SizedBox(width: 8),
                           Text(
                             'Удалить',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ],
                       ),
@@ -77,14 +80,18 @@ class JournalPage extends StatelessWidget {
                       context.read<AppState>().deleteJournalEntry(e);
                       ScaffoldMessenger.of(context)
                         ..clearSnackBars()
-                        ..showSnackBar(const SnackBar(content: Text('Запись удалена')));
+                        ..showSnackBar(
+                          const SnackBar(content: Text('Запись удалена')),
+                        );
                     },
                     child: InkWell(
                       borderRadius: BorderRadius.circular(AppRadii.xl),
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => JournalDetailPage(entry: e)),
+                          MaterialPageRoute(
+                            builder: (_) => JournalDetailPage(entry: e),
+                          ),
                         );
                       },
                       child: Container(
@@ -102,14 +109,20 @@ class JournalPage extends StatelessWidget {
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: AppColors.accent.withAlpha((0.12 * 255).round()),
+                                color: AppColors.accent.withAlpha(
+                                  (0.12 * 255).round(),
+                                ),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: AppColors.accent.withAlpha((0.18 * 255).round()),
+                                  color: AppColors.accent.withAlpha(
+                                    (0.18 * 255).round(),
+                                  ),
                                 ),
                               ),
                               child: Icon(
-                                hasImages ? Icons.collections_rounded : Icons.book_rounded,
+                                hasImages
+                                    ? Icons.collections_rounded
+                                    : Icons.book_rounded,
                                 color: AppColors.accent,
                               ),
                             ),
@@ -125,7 +138,10 @@ class JournalPage extends StatelessWidget {
                                           _safeTitle(e),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
                                                 fontWeight: FontWeight.w900,
                                                 color: AppColors.textPrimary,
                                               ),
@@ -134,12 +150,21 @@ class JournalPage extends StatelessWidget {
                                       const SizedBox(width: 10),
                                       if (hasImages)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF10B981).withAlpha((0.10 * 255).round()),
-                                            borderRadius: BorderRadius.circular(999),
+                                            color: const Color(
+                                              0xFF10B981,
+                                            ).withAlpha((0.10 * 255).round()),
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
                                             border: Border.all(
-                                              color: const Color(0xFF10B981).withAlpha((0.18 * 255).round()),
+                                              color: const Color(
+                                                0xFF10B981,
+                                              ).withAlpha((0.18 * 255).round()),
                                             ),
                                           ),
                                           child: Text(
@@ -167,7 +192,11 @@ class JournalPage extends StatelessWidget {
                                   const SizedBox(height: 10),
                                   Row(
                                     children: const [
-                                      Icon(Icons.swipe_left_rounded, size: 16, color: AppColors.textMuted),
+                                      Icon(
+                                        Icons.swipe_left_rounded,
+                                        size: 16,
+                                        color: AppColors.textMuted,
+                                      ),
                                       SizedBox(width: 6),
                                       Text(
                                         'Свайп влево — удалить',
@@ -178,7 +207,10 @@ class JournalPage extends StatelessWidget {
                                         ),
                                       ),
                                       Spacer(),
-                                      Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: AppColors.textMuted,
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -221,20 +253,27 @@ class _EmptyJournal extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.accent.withAlpha((0.12 * 255).round()),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: AppColors.accent.withAlpha((0.18 * 255).round())),
+                border: Border.all(
+                  color: AppColors.accent.withAlpha((0.18 * 255).round()),
+                ),
               ),
               child: const Icon(Icons.book_rounded, color: AppColors.accent),
             ),
             const SizedBox(height: 14),
             Text(
               'Записей пока нет',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 8),
             const Text(
               'Создай первую запись — за дневник ты получаешь XP.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 14),
             ElevatedButton.icon(

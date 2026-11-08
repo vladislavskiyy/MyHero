@@ -26,16 +26,18 @@ class TaskAdapter extends TypeAdapter<Task> {
       priority: fields[4] as int?,
       listId: fields[8] as String?,
       recurrenceType: TaskRecurrenceType.values[(fields[9] as int? ?? 0)],
-      taskPriority: TaskPriority.values[(fields[10] as int? ?? TaskPriority.medium.index)],
+      taskPriority: TaskPriority
+          .values[(fields[10] as int? ?? TaskPriority.medium.index)],
       deadline: fields[11] as DateTime?,
       estimatedDurationMinutes: fields[12] as int? ?? (fields[3] as int?),
+      breakdownSteps: (fields[13] as List?)?.cast<String>() ?? [],
     )..colorValue = fields[7] as int?;
   }
 
   @override
   void write(BinaryWriter writer, Task obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -61,7 +63,9 @@ class TaskAdapter extends TypeAdapter<Task> {
       ..writeByte(11)
       ..write(obj.deadline)
       ..writeByte(12)
-      ..write(obj.estimatedDurationMinutes);
+      ..write(obj.estimatedDurationMinutes)
+      ..writeByte(13)
+      ..write(obj.breakdownSteps);
   }
 
   @override

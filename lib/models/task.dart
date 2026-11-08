@@ -2,22 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
-import 'dart:math' as math;
 
 part 'task.g.dart';
 
-enum TaskRecurrenceType {
-  none,
-  daily,
-  weekly,
-  monthly,
-}
+enum TaskRecurrenceType { none, daily, weekly, monthly }
 
-enum TaskPriority {
-  low,
-  medium,
-  high,
-}
+enum TaskPriority { low, medium, high }
 
 @HiveType(typeId: 1)
 class Task extends HiveObject {
@@ -60,6 +50,9 @@ class Task extends HiveObject {
   @HiveField(12)
   int? estimatedDurationMinutes;
 
+  @HiveField(13)
+  List<String> breakdownSteps;
+
   Task({
     required this.id,
     required this.title,
@@ -74,19 +67,31 @@ class Task extends HiveObject {
     TaskPriority? taskPriority,
     this.deadline,
     this.estimatedDurationMinutes,
+    List<String>? breakdownSteps,
   }) : recurrenceTypeValue = recurrenceType.index,
-        priorityLevelValue = (taskPriority ?? TaskPriority.medium).index;
+       priorityLevelValue = (taskPriority ?? TaskPriority.medium).index,
+       breakdownSteps = breakdownSteps ?? [];
 
   Color? get color => colorValue != null ? Color(colorValue!) : null;
-  set color(Color? c) => colorValue = c?.value;
+  set color(Color? c) => colorValue = c?.toARGB32();
 
-  TaskRecurrenceType get recurrenceType => TaskRecurrenceType.values[recurrenceTypeValue.clamp(0, TaskRecurrenceType.values.length - 1)];
-  set recurrenceType(TaskRecurrenceType value) => recurrenceTypeValue = value.index;
+  TaskRecurrenceType get recurrenceType =>
+      TaskRecurrenceType.values[recurrenceTypeValue.clamp(
+        0,
+        TaskRecurrenceType.values.length - 1,
+      )];
+  set recurrenceType(TaskRecurrenceType value) =>
+      recurrenceTypeValue = value.index;
 
-  TaskPriority get taskPriority => TaskPriority.values[priorityLevelValue.clamp(0, TaskPriority.values.length - 1)];
+  TaskPriority get taskPriority =>
+      TaskPriority.values[priorityLevelValue.clamp(
+        0,
+        TaskPriority.values.length - 1,
+      )];
   set taskPriority(TaskPriority value) => priorityLevelValue = value.index;
 
-  int get effectiveDurationMinutes => (durationMinutes ?? estimatedDurationMinutes ?? 30).clamp(1, 24 * 60);
+  int get effectiveDurationMinutes =>
+      (durationMinutes ?? estimatedDurationMinutes ?? 30).clamp(1, 24 * 60);
 
   bool appearsOn(DateTime day) {
     final taskDate = date;
@@ -103,7 +108,8 @@ class Task extends HiveObject {
         return diff % 7 == 0;
       case TaskRecurrenceType.monthly:
         if (day.isBefore(taskDate)) return false;
-        final diffMonths = (day.year - taskDate.year) * 12 + (day.month - taskDate.month);
+        final diffMonths =
+            (day.year - taskDate.year) * 12 + (day.month - taskDate.month);
         return diffMonths >= 0 && day.day == taskDate.day;
     }
   }
@@ -112,25 +118,30 @@ class Task extends HiveObject {
     return Task(
       id: map['id'] as String,
       title: map['title'] as String,
-      date: map['date'] != null
-          ? DateTime.parse(map['date'] as String)
-          : null,
+      date: map['date'] != null ? DateTime.parse(map['date'] as String) : null,
       category: map['category'] as String?,
-      color: map['color'] != null
-          ? Color(map['color'] as int)
-          : null,
+      color: map['color'] != null ? Color(map['color'] as int) : null,
       isDone: map['isDone'] as bool? ?? false,
       durationMinutes: map['durationMinutes'] as int?,
       priority: map['priority'] as int?,
       listId: map['listId'] as String?,
-      recurrenceType: TaskRecurrenceType.values[(map['recurrenceType'] as int? ?? 0)],
+      recurrenceType:
+          TaskRecurrenceType.values[(map['recurrenceType'] as int? ?? 0)],
       taskPriority: map['taskPriority'] != null
-          ? TaskPriority.values[(map['taskPriority'] as int? ?? TaskPriority.medium.index)]
+          ? TaskPriority.values[(map['taskPriority'] as int? ??
+                TaskPriority.medium.index)]
           : (map['priorityLevelValue'] != null
-              ? TaskPriority.values[(map['priorityLevelValue'] as int)]
-              : TaskPriority.medium),
-      deadline: map['deadline'] != null ? DateTime.tryParse(map['deadline'] as String) : null,
-      estimatedDurationMinutes: map['estimatedDurationMinutes'] as int? ?? map['durationMinutes'] as int?,
+                ? TaskPriority.values[(map['priorityLevelValue'] as int)]
+                : TaskPriority.medium),
+      deadline: map['deadline'] != null
+          ? DateTime.tryParse(map['deadline'] as String)
+          : null,
+      estimatedDurationMinutes:
+          map['estimatedDurationMinutes'] as int? ??
+          map['durationMinutes'] as int?,
+      breakdownSteps: (map['breakdownSteps'] as List<dynamic>? ?? [])
+          .whereType<String>()
+          .toList(),
     );
   }
 
@@ -149,6 +160,7 @@ class Task extends HiveObject {
       'priorityLevelValue': priorityLevelValue,
       'deadline': deadline?.toIso8601String(),
       'estimatedDurationMinutes': estimatedDurationMinutes,
+      'breakdownSteps': breakdownSteps,
       'taskPriority': taskPriority.index,
     };
   }

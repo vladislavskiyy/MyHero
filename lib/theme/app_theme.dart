@@ -92,7 +92,7 @@ class AppTheme {
       ),
 
       // Карточки: чуть менее “материальные”, больше “современные”
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0, // тень задаём через BoxShadow в декорациях/виджетах
         margin: EdgeInsets.zero,

@@ -7,10 +7,7 @@ import '../state/app_state.dart';
 import '../models/habit.dart';
 import '../theme/app_theme.dart';
 
-Future<void> showHabitDialog(
-  BuildContext context, {
-  Habit? habit,
-}) async {
+Future<void> showHabitDialog(BuildContext context, {Habit? habit}) async {
   final isEdit = habit != null;
 
   final nameCtrl = TextEditingController(text: habit?.title ?? '');
@@ -35,11 +32,13 @@ Future<void> showHabitDialog(
     builder: (ctx) {
       return SafeArea(
         child: Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
           child: StatefulBuilder(
             builder: (ctx, setState) {
               Widget colorDot(Color c) {
-                final selected = pickColor.value == c.value;
+                final selected = pickColor.toARGB32() == c.toARGB32();
                 return InkWell(
                   borderRadius: BorderRadius.circular(999),
                   onTap: () => setState(() => pickColor = c),
@@ -52,7 +51,9 @@ Future<void> showHabitDialog(
                       color: c,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: selected ? Colors.black.withValues(alpha: 0.65) : Colors.white,
+                        color: selected
+                            ? Colors.black.withValues(alpha: 0.65)
+                            : Colors.white,
                         width: selected ? 2.5 : 1.5,
                       ),
                       boxShadow: [
@@ -64,7 +65,11 @@ Future<void> showHabitDialog(
                       ],
                     ),
                     child: selected
-                        ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+                        ? const Icon(
+                            Icons.check_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          )
                         : null,
                   ),
                 );
@@ -89,7 +94,11 @@ Future<void> showHabitDialog(
                         width: selected ? 1.8 : 1.2,
                       ),
                     ),
-                    child: Icon(ic, color: selected ? pickColor : AppColors.textMuted, size: 24),
+                    child: Icon(
+                      ic,
+                      color: selected ? pickColor : AppColors.textMuted,
+                      size: 24,
+                    ),
                   ),
                 );
               }
@@ -99,7 +108,9 @@ Future<void> showHabitDialog(
               return Container(
                 decoration: BoxDecoration(
                   color: AppColors.surface,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.xl)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadii.xl),
+                  ),
                   border: Border.all(color: AppColors.border),
                   boxShadow: const [
                     BoxShadow(
@@ -130,8 +141,11 @@ Future<void> showHabitDialog(
                       children: [
                         Expanded(
                           child: Text(
-                            isEdit ? 'Редактировать привычку' : 'Новая привычка',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            isEdit
+                                ? 'Редактировать привычку'
+                                : 'Новая привычка',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.w900,
                                   color: AppColors.textPrimary,
                                 ),
@@ -162,9 +176,9 @@ Future<void> showHabitDialog(
                     Text(
                       'Цвет',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                          ),
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -187,9 +201,9 @@ Future<void> showHabitDialog(
                     Text(
                       'Иконка',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textPrimary,
-                          ),
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Wrap(
@@ -203,7 +217,9 @@ Future<void> showHabitDialog(
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: canSave ? pickColor : AppColors.border,
-                        foregroundColor: canSave ? Colors.white : AppColors.textMuted,
+                        foregroundColor: canSave
+                            ? Colors.white
+                            : AppColors.textMuted,
                         minimumSize: const Size.fromHeight(52),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadii.m),
@@ -219,7 +235,7 @@ Future<void> showHabitDialog(
                                 final newHabit = Habit(
                                   id: DateTime.now().toIso8601String(),
                                   title: name,
-                                  colorValue: pickColor.value,
+                                  colorValue: pickColor.toARGB32(),
                                   iconCodePoint: pickIcon.codePoint,
                                   iconFontFamily: pickIcon.fontFamily ?? '',
                                 );
@@ -240,7 +256,9 @@ Future<void> showHabitDialog(
                               Navigator.pop(ctx);
                             }
                           : null,
-                      icon: Icon(isEdit ? Icons.save_rounded : Icons.add_rounded),
+                      icon: Icon(
+                        isEdit ? Icons.save_rounded : Icons.add_rounded,
+                      ),
                       label: Text(isEdit ? 'Сохранить' : 'Создать'),
                     ),
                   ],

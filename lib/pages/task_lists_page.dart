@@ -10,7 +10,7 @@ import '../dialogs/list_dialog.dart';
 import 'task_list_page.dart';
 
 class TaskListsPage extends StatelessWidget {
-  const TaskListsPage({Key? key}) : super(key: key);
+  const TaskListsPage({super.key});
 
   IconData _iconForList(String id) {
     switch (id) {
@@ -115,7 +115,8 @@ class TaskListsPage extends StatelessWidget {
                               list.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.textPrimary,
                                   ),
@@ -134,7 +135,10 @@ class TaskListsPage extends StatelessWidget {
                                     subtitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
                                           color: AppColors.textMuted,
                                           fontWeight: FontWeight.w600,
                                           fontSize: 12.5,
@@ -186,7 +190,10 @@ class TaskListsPage extends StatelessWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showListDialog(context),
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text('Новый список', style: TextStyle(color: Colors.white)),
+        label: const Text(
+          'Новый список',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
     );
   }

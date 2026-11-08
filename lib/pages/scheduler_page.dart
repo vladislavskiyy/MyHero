@@ -1,7 +1,5 @@
 // lib/pages/scheduler_page.dart
 
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +12,7 @@ import '../theme/app_theme.dart';
 class SchedulerPage extends StatefulWidget {
   static const routeName = '/scheduler';
 
-  const SchedulerPage({Key? key}) : super(key: key);
+  const SchedulerPage({super.key});
 
   @override
   State<SchedulerPage> createState() => _SchedulerPageState();
@@ -35,7 +33,11 @@ class _SchedulerPageState extends State<SchedulerPage> {
   void _runOptimization(BuildContext context) {
     final appState = context.read<AppState>();
     final allTasks = appState.lists.expand((l) => l.tasks).toList();
-    final plan = appState.generatePlanForDay(_selectedDay, _capacity, tasks: allTasks);
+    final plan = appState.generatePlanForDay(
+      _selectedDay,
+      _capacity,
+      tasks: allTasks,
+    );
     setState(() => _proposal = plan);
     FocusScope.of(context).unfocus();
   }
@@ -48,7 +50,9 @@ class _SchedulerPageState extends State<SchedulerPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(const SnackBar(content: Text('План сохранён для этого дня')));
+      ..showSnackBar(
+        const SnackBar(content: Text('План сохранён для этого дня')),
+      );
   }
 
   Future<void> _exportJson(BuildContext context) async {
@@ -58,7 +62,9 @@ class _SchedulerPageState extends State<SchedulerPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
-      ..showSnackBar(const SnackBar(content: Text('JSON скопирован в буфер обмена')));
+      ..showSnackBar(
+        const SnackBar(content: Text('JSON скопирован в буфер обмена')),
+      );
   }
 
   @override
@@ -101,22 +107,30 @@ class _SchedulerPageState extends State<SchedulerPage> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: AppColors.accent.withAlpha((0.12 * 255).round()),
+                            color: AppColors.accent.withAlpha(
+                              (0.12 * 255).round(),
+                            ),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.accent.withAlpha((0.18 * 255).round()),
+                              color: AppColors.accent.withAlpha(
+                                (0.18 * 255).round(),
+                              ),
                             ),
                           ),
-                          child: const Icon(Icons.auto_awesome_rounded, color: AppColors.accent),
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: AppColors.accent,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'План на день',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.textPrimary,
+                                ),
                           ),
                         ),
                       ],
@@ -128,7 +142,8 @@ class _SchedulerPageState extends State<SchedulerPage> {
                           child: _ActionTile(
                             icon: Icons.calendar_today_rounded,
                             title: 'Дата',
-                            value: '${_selectedDay.day.toString().padLeft(2, '0')}.${_selectedDay.month.toString().padLeft(2, '0')}.${_selectedDay.year}',
+                            value:
+                                '${_selectedDay.day.toString().padLeft(2, '0')}.${_selectedDay.month.toString().padLeft(2, '0')}.${_selectedDay.year}',
                             onTap: () async {
                               final picked = await showDatePicker(
                                 context: context,
@@ -136,7 +151,9 @@ class _SchedulerPageState extends State<SchedulerPage> {
                                 firstDate: DateTime(2020),
                                 lastDate: DateTime(2035),
                               );
-                              if (picked != null) setState(() => _selectedDay = picked);
+                              if (picked != null) {
+                                setState(() => _selectedDay = picked);
+                              }
                             },
                           ),
                         ),
@@ -152,7 +169,9 @@ class _SchedulerPageState extends State<SchedulerPage> {
                             ),
                             onChanged: (v) {
                               final parsed = int.tryParse(v);
-                              if (parsed != null) setState(() => _capacity = parsed);
+                              if (parsed != null) {
+                                setState(() => _capacity = parsed);
+                              }
                             },
                           ),
                         ),
@@ -163,9 +182,11 @@ class _SchedulerPageState extends State<SchedulerPage> {
                       onPressed: () => _runOptimization(context),
                       icon: const Icon(Icons.bolt_rounded),
                       label: const Text('Сгенерировать план'),
-                      style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                      ),
                     ),
-                    if (_proposal != null) ... [
+                    if (_proposal != null) ...[
                       const SizedBox(height: 18),
                       Row(
                         children: [
@@ -211,7 +232,7 @@ class _SchedulerPageState extends State<SchedulerPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (_proposal != null) ... [
+              if (_proposal != null) ...[
                 Container(
                   decoration: BoxDecoration(
                     color: AppColors.surface,
@@ -231,13 +252,18 @@ class _SchedulerPageState extends State<SchedulerPage> {
                       ),
                       const SizedBox(height: 12),
                       if (selectedIds.isEmpty)
-                        const Text('Ничего не вошло в план — попробуйте увеличить доступное время.')
-                      else ... [
+                        const Text(
+                          'Ничего не вошло в план — попробуйте увеличить доступное время.',
+                        )
+                      else ...[
                         ...selectedIds.map((id) {
-                          final task = appState.lists.expand((list) => list.tasks).firstWhere(
-                            (element) => element.id == id,
-                            orElse: () => Task(id: 'empty', title: 'Не найдено'),
-                          );
+                          final task = appState.lists
+                              .expand((list) => list.tasks)
+                              .firstWhere(
+                                (element) => element.id == id,
+                                orElse: () =>
+                                    Task(id: 'empty', title: 'Не найдено'),
+                              );
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.all(10),
@@ -248,12 +274,17 @@ class _SchedulerPageState extends State<SchedulerPage> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.check_circle_rounded, color: AppColors.accent),
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  color: AppColors.accent,
+                                ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
                                     task.title,
-                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -261,14 +292,15 @@ class _SchedulerPageState extends State<SchedulerPage> {
                           );
                         }),
                       ],
-                      if (dropped.isNotEmpty) ... [
+                      if (dropped.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Text(
                           'Не вошли в план',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.textMuted,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textMuted,
+                              ),
                         ),
                         const SizedBox(height: 8),
                         ...dropped.map((title) => Text('• $title')),
@@ -298,10 +330,13 @@ class _SchedulerPageState extends State<SchedulerPage> {
                     const SizedBox(height: 12),
                     if (history.isEmpty)
                       const Text('Пока нет сохранённых планов')
-                    else ... [
+                    else ...[
                       ...history.map((plan) {
-                        final date = DateTime.tryParse(plan['date'] as String? ?? '') ?? DateTime.now();
-                        final selected = (plan['selectedTaskIds'] as List? ?? []).length;
+                        final date =
+                            DateTime.tryParse(plan['date'] as String? ?? '') ??
+                            DateTime.now();
+                        final selected =
+                            (plan['selectedTaskIds'] as List? ?? []).length;
                         final used = plan['usedMinutes'] as int? ?? 0;
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
@@ -313,7 +348,10 @@ class _SchedulerPageState extends State<SchedulerPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.history_rounded, color: AppColors.textMuted),
+                              const Icon(
+                                Icons.history_rounded,
+                                color: AppColors.textMuted,
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
@@ -321,12 +359,16 @@ class _SchedulerPageState extends State<SchedulerPage> {
                                   children: [
                                     Text(
                                       '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}',
-                                      style: const TextStyle(fontWeight: FontWeight.w800),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       '$selected задач · $used мин',
-                                      style: const TextStyle(color: AppColors.textMuted),
+                                      style: const TextStyle(
+                                        color: AppColors.textMuted,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -380,9 +422,18 @@ class _ActionTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(
+                    value,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
             ),
@@ -398,7 +449,11 @@ class _MiniPill extends StatelessWidget {
   final String label;
   final IconData icon;
 
-  const _MiniPill({required this.color, required this.label, required this.icon});
+  const _MiniPill({
+    required this.color,
+    required this.label,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {

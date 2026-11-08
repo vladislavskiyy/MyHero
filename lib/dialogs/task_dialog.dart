@@ -1,12 +1,14 @@
 // lib/dialogs/task_dialog.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 
 import '../models/task.dart';
 import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
+import '../services/task_ai_service.dart';
 
 Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
   final isEdit = task != null;
@@ -18,8 +20,11 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
   Color selectedColor = task?.color ?? AppColors.accent;
 
   int? durationMinutes = task?.durationMinutes;
+  final estimatedDurationMinutes = task?.estimatedDurationMinutes;
+  final breakdownSteps = task?.breakdownSteps ?? <String>[];
   int? priority = task?.priority;
-  TaskRecurrenceType recurrenceType = task?.recurrenceType ?? TaskRecurrenceType.none;
+  TaskRecurrenceType recurrenceType =
+      task?.recurrenceType ?? TaskRecurrenceType.none;
 
   await showModalBottomSheet(
     context: context,
@@ -28,76 +33,91 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
     builder: (ctx) => SafeArea(
       child: Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: _TaskSheet(
-          isEdit: isEdit,
-          titleController: titleController,
-          initialDate: selectedDate,
-          initialCategory: category,
-          initialColor: selectedColor,
-          initialDuration: durationMinutes,
-          initialPriority: priority,
-          initialRecurrenceType: recurrenceType,
-          onSave: ({
-            required String title,
-            required DateTime? date,
-            required String category,
-            required Color color,
-            required int? duration,
-            required int? priority,
-            required TaskRecurrenceType recurrenceType,
-          }) {
-            final appState = context.read<AppState>();
+        child: SingleChildScrollView(
+          child: _TaskSheet(
+            isEdit: isEdit,
+            titleController: titleController,
+            initialDate: selectedDate,
+            initialCategory: category,
+            initialColor: selectedColor,
+            initialDuration: durationMinutes,
+            initialEstimatedDuration: estimatedDurationMinutes,
+            initialBreakdownSteps: breakdownSteps,
+            initialPriority: priority,
+            initialRecurrenceType: recurrenceType,
+            onSave:
+                ({
+                  required String title,
+                  required DateTime? date,
+                  required String category,
+                  required Color color,
+                  required int? duration,
+                  required int? estimatedDuration,
+                  required List<String> breakdownSteps,
+                  required int? priority,
+                  required TaskRecurrenceType recurrenceType,
+                }) async {
+                  final appState = context.read<AppState>();
 
-            final catToSave = category.trim().isNotEmpty ? category.trim() : null;
-            final colorToSave = category.trim().isNotEmpty ? color : null;
+                  final catToSave = category.trim().isNotEmpty
+                      ? category.trim()
+                      : null;
+                  final colorToSave = category.trim().isNotEmpty ? color : null;
 
-            if (isEdit) {
-              task
-                ..title = title
-                ..date = date
-                ..category = catToSave
-                ..color = colorToSave
-                ..durationMinutes = duration
-                ..priority = priority
-                ..recurrenceType = recurrenceType;
+                  if (isEdit) {
+                    task
+                      ..title = title
+                      ..date = date
+                      ..category = catToSave
+                      ..color = colorToSave
+                      ..durationMinutes = duration
+                      ..estimatedDurationMinutes = estimatedDuration
+                      ..breakdownSteps = breakdownSteps
+                      ..priority = priority
+                      ..recurrenceType = recurrenceType;
 
-              appState.updateTask(
-                task,
-                title: title,
-                date: date,
-                category: catToSave,
-                color: colorToSave,
-              );
-            } else {
-              appState.addTask(
-                Task(
-                  id: DateTime.now().toIso8601String(),
-                  title: title,
-                  date: date,
-                  category: catToSave,
-                  color: colorToSave,
-                  durationMinutes: duration,
-                  priority: priority,
-                  recurrenceType: recurrenceType,
-                ),
-              );
-            }
+                    await appState.updateTask(
+                      task,
+                      title: title,
+                      date: date,
+                      category: catToSave,
+                      color: colorToSave,
+                    );
+                  } else {
+                    await appState.addTask(
+                      Task(
+                        id: DateTime.now().toIso8601String(),
+                        title: title,
+                        date: date,
+                        category: catToSave,
+                        color: colorToSave,
+                        durationMinutes: duration,
+                        estimatedDurationMinutes: estimatedDuration,
+                        breakdownSteps: breakdownSteps,
+                        priority: priority,
+                        recurrenceType: recurrenceType,
+                      ),
+                    );
+                  }
 
-            if (date != null && appState.notificationsEnabled) {
-              final reminderDate = date.subtract(const Duration(minutes: 30));
-              if (reminderDate.isAfter(DateTime.now())) {
-                NotificationService().scheduleNotification(
-                  id: date.millisecondsSinceEpoch ~/ 1000,
-                  title: 'Напоминание о задаче',
-                  body: title,
-                  scheduledDate: reminderDate,
-                  payload: title,
-                );
-              }
-            }
+                  if (date != null && appState.notificationsEnabled) {
+                    final reminderDate = date.subtract(
+                      const Duration(minutes: 30),
+                    );
+                    if (reminderDate.isAfter(DateTime.now())) {
+                      await NotificationService().scheduleNotification(
+                        id: date.millisecondsSinceEpoch ~/ 1000,
+                        title: 'Напоминание о задаче',
+                        body: title,
+                        scheduledDate: reminderDate,
+                        payload: title,
+                      );
+                    }
+                  }
 
-            Navigator.pop(ctx);
-          },
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+          ),
         ),
       ),
     ),
@@ -112,18 +132,23 @@ class _TaskSheet extends StatefulWidget {
   final String initialCategory;
   final Color initialColor;
   final int? initialDuration;
+  final int? initialEstimatedDuration;
+  final List<String> initialBreakdownSteps;
   final int? initialPriority;
   final TaskRecurrenceType initialRecurrenceType;
 
-  final void Function({
+  final Future<void> Function({
     required String title,
     required DateTime? date,
     required String category,
     required Color color,
     required int? duration,
+    required int? estimatedDuration,
+    required List<String> breakdownSteps,
     required int? priority,
     required TaskRecurrenceType recurrenceType,
-  }) onSave;
+  })
+  onSave;
 
   const _TaskSheet({
     required this.isEdit,
@@ -132,6 +157,8 @@ class _TaskSheet extends StatefulWidget {
     required this.initialCategory,
     required this.initialColor,
     required this.initialDuration,
+    required this.initialEstimatedDuration,
+    required this.initialBreakdownSteps,
     required this.initialPriority,
     required this.initialRecurrenceType,
     required this.onSave,
@@ -146,10 +173,48 @@ class _TaskSheetState extends State<_TaskSheet> {
   late String _category = widget.initialCategory;
   late Color _color = widget.initialColor;
   late int? _duration = widget.initialDuration;
+  late int? _estimatedDuration = widget.initialEstimatedDuration;
+  late List<String> _breakdownSteps = List.of(widget.initialBreakdownSteps);
   late int? _priority = widget.initialPriority;
   late TaskRecurrenceType _recurrenceType = widget.initialRecurrenceType;
 
   bool _advanced = false;
+  bool _isGeneratingSuggestion = false;
+  bool _isSaving = false;
+  String? _saveError;
+  String? _aiError;
+  String? _estimateRange;
+  String? _estimateAssumptions;
+
+  Future<void> _generateSuggestion() async {
+    final title = widget.titleController.text.trim();
+    if (title.isEmpty) {
+      setState(() => _aiError = 'Сначала введите название задачи.');
+      return;
+    }
+
+    setState(() {
+      _isGeneratingSuggestion = true;
+      _aiError = null;
+    });
+
+    try {
+      final suggestion = await TaskAiService().estimateAndBreakDown(title);
+      if (!mounted) return;
+      setState(() {
+        _estimatedDuration = suggestion.estimateMinutes;
+        _breakdownSteps = suggestion.steps;
+        _estimateRange =
+            '${suggestion.minMinutes}–${suggestion.maxMinutes} мин';
+        _estimateAssumptions = suggestion.assumptions;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _aiError = 'Не удалось получить оценку: $error');
+    } finally {
+      if (mounted) setState(() => _isGeneratingSuggestion = false);
+    }
+  }
 
   String get _dateText {
     final d = _date;
@@ -160,13 +225,21 @@ class _TaskSheetState extends State<_TaskSheet> {
   @override
   Widget build(BuildContext context) {
     final title = widget.isEdit ? 'Редактирование задачи' : 'Новая задача';
+    final isAiSupported =
+        kIsWeb || defaultTargetPlatform == TargetPlatform.android;
 
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadii.xl)),
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppRadii.xl),
+        ),
         boxShadow: const [
-          BoxShadow(color: Color(0x33000000), blurRadius: 24, offset: Offset(0, -8)),
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 24,
+            offset: Offset(0, -8),
+          ),
         ],
         border: Border.all(color: AppColors.border),
       ),
@@ -194,9 +267,9 @@ class _TaskSheetState extends State<_TaskSheet> {
                   child: Text(
                     title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textPrimary,
-                        ),
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -218,6 +291,83 @@ class _TaskSheetState extends State<_TaskSheet> {
                 prefixIcon: Icon(Icons.edit_rounded),
               ),
             ),
+
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: !isAiSupported || _isGeneratingSuggestion
+                  ? null
+                  : _generateSuggestion,
+              icon: _isGeneratingSuggestion
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome_rounded),
+              label: Text(
+                !isAiSupported
+                    ? 'AI-помощник доступен в Android-приложении и Web'
+                    : _isGeneratingSuggestion
+                    ? 'Оцениваю задачу...'
+                    : 'Оценить длительность и разбить',
+              ),
+            ),
+            if (_aiError != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                _aiError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            if (_estimatedDuration != null || _breakdownSteps.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withAlpha((0.08 * 255).round()),
+                  borderRadius: BorderRadius.circular(AppRadii.l),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_estimatedDuration != null)
+                      Text(
+                        'Оценка: около $_estimatedDuration мин'
+                        '${_estimateRange == null ? '' : ' ($_estimateRange)'}',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    if (_estimateAssumptions?.isNotEmpty ?? false) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _estimateAssumptions!,
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    if (_breakdownSteps.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      for (var i = 0; i < _breakdownSteps.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text('${i + 1}. ${_breakdownSteps[i]}'),
+                        ),
+                    ],
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Шаги и оценка сохранятся вместе с задачей. '
+                      'Проверьте их перед сохранением.',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 12),
 
@@ -278,7 +428,9 @@ class _TaskSheetState extends State<_TaskSheet> {
 
             // Advanced section
             Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 initiallyExpanded: _advanced,
                 onExpansionChanged: (v) => setState(() => _advanced = v),
@@ -327,7 +479,9 @@ class _TaskSheetState extends State<_TaskSheet> {
                       }
                     },
                     icon: Icons.repeat_rounded,
-                    onChanged: (v) => setState(() => _recurrenceType = v ?? TaskRecurrenceType.none),
+                    onChanged: (v) => setState(
+                      () => _recurrenceType = v ?? TaskRecurrenceType.none,
+                    ),
                   ),
                 ],
               ),
@@ -336,29 +490,64 @@ class _TaskSheetState extends State<_TaskSheet> {
             const SizedBox(height: 10),
 
             // Save
+            if (_saveError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Не удалось сохранить задачу: $_saveError',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
             ElevatedButton.icon(
-              onPressed: () {
-                final title = widget.titleController.text.trim();
-                if (title.isEmpty) {
-                  ScaffoldMessenger.of(context)
-                    ..clearSnackBars()
-                    ..showSnackBar(const SnackBar(content: Text('Введите название задачи')));
-                  return;
-                }
+              onPressed: _isSaving
+                  ? null
+                  : () async {
+                      final title = widget.titleController.text.trim();
+                      if (title.isEmpty) {
+                        ScaffoldMessenger.of(context)
+                          ..clearSnackBars()
+                          ..showSnackBar(
+                            const SnackBar(
+                              content: Text('Введите название задачи'),
+                            ),
+                          );
+                        return;
+                      }
 
-                widget.onSave(
-                  title: title,
-                  date: _date,
-                  category: _category,
-                  color: _color,
-                  duration: _duration,
-                  priority: _priority,
-                  recurrenceType: _recurrenceType,
-                );
-              },
+                      setState(() {
+                        _isSaving = true;
+                        _saveError = null;
+                      });
+                      try {
+                        await widget.onSave(
+                          title: title,
+                          date: _date,
+                          category: _category,
+                          color: _color,
+                          duration: _duration,
+                          estimatedDuration: _estimatedDuration,
+                          breakdownSteps: _breakdownSteps,
+                          priority: _priority,
+                          recurrenceType: _recurrenceType,
+                        );
+                      } catch (error) {
+                        if (mounted) {
+                          setState(() => _saveError = error.toString());
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isSaving = false);
+                      }
+                    },
               icon: const Icon(Icons.check_rounded),
-              label: Text(widget.isEdit ? 'Сохранить' : 'Создать'),
-              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              label: Text(
+                _isSaving
+                    ? 'Сохраняю...'
+                    : widget.isEdit
+                    ? 'Сохранить'
+                    : 'Создать',
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
             ),
           ],
         ),
@@ -374,7 +563,9 @@ class _TaskSheetState extends State<_TaskSheet> {
       context: context,
       builder: (dctx) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xl)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.xl),
+          ),
           title: const Text('Тег и цвет'),
           content: SingleChildScrollView(
             child: Column(
@@ -393,7 +584,9 @@ class _TaskSheetState extends State<_TaskSheet> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     'Цвет',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -414,7 +607,9 @@ class _TaskSheetState extends State<_TaskSheet> {
                             decoration: BoxDecoration(
                               color: c,
                               shape: BoxShape.circle,
-                              border: isSel ? Border.all(width: 3, color: Colors.black) : null,
+                              border: isSel
+                                  ? Border.all(width: 3, color: Colors.black)
+                                  : null,
                             ),
                           ),
                         );
@@ -503,10 +698,7 @@ class _ActionTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: 10),
-              trailing!,
-            ],
+            if (trailing != null) ...[const SizedBox(width: 10), trailing!],
             const SizedBox(width: 6),
             const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
           ],
@@ -566,10 +758,12 @@ class _LabeledDropdown<T> extends StatelessWidget {
                     isExpanded: true,
                     hint: Text(hint),
                     items: items
-                        .map((x) => DropdownMenuItem<T>(
-                              value: x,
-                              child: Text(itemLabel(x)),
-                            ))
+                        .map(
+                          (x) => DropdownMenuItem<T>(
+                            value: x,
+                            child: Text(itemLabel(x)),
+                          ),
+                        )
                         .toList(),
                     onChanged: onChanged,
                   ),

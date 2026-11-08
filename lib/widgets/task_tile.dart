@@ -20,7 +20,9 @@ class TaskTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stripeColor = (task.category?.isNotEmpty ?? false) ? task.color : AppColors.textMuted;
+    final stripeColor = (task.category?.isNotEmpty ?? false)
+        ? task.color
+        : AppColors.textMuted;
     final dateText = task.date != null
         ? '${task.date!.day.toString().padLeft(2, '0')}.${task.date!.month.toString().padLeft(2, '0')}.${task.date!.year}'
         : null;
@@ -40,11 +42,11 @@ class TaskTile extends StatelessWidget {
           child: InkWell(
             onLongPress: () => onDelete(task),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // Цветная “полоса” слева
                 Container(
                   width: 8,
-                  height: 84,
                   decoration: BoxDecoration(
                     color: stripeColor,
                     borderRadius: const BorderRadius.only(
@@ -98,15 +100,48 @@ class TaskTile extends StatelessWidget {
                                   fontSize: 15.5,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.textPrimary,
-                                  decoration: task.isDone ? TextDecoration.lineThrough : null,
+                                  decoration: task.isDone
+                                      ? TextDecoration.lineThrough
+                                      : null,
                                 ),
                               ),
+                              if (task.estimatedDurationMinutes != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Оценка: около ${task.estimatedDurationMinutes} мин',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                              ],
+                              if (task.breakdownSteps.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                for (
+                                  var i = 0;
+                                  i < task.breakdownSteps.length;
+                                  i++
+                                )
+                                  Text(
+                                    '${i + 1}. ${task.breakdownSteps[i]}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                              ],
                               if (dateText != null) ...[
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    const Icon(Icons.calendar_today_rounded,
-                                        size: 14, color: AppColors.textMuted),
+                                    const Icon(
+                                      Icons.calendar_today_rounded,
+                                      size: 14,
+                                      color: AppColors.textMuted,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       dateText,

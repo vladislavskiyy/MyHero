@@ -29,8 +29,9 @@ class SettingsPage extends StatelessWidget {
             subtitle: state.isDarkMode ? 'Тёмная тема' : 'Светлая тема',
             trailing: Switch(
               value: state.isDarkMode,
-              onChanged: (value) => context.read<AppState>().toggleDarkMode(value),
-              activeColor: AppColors.accent,
+              onChanged: (value) =>
+                  context.read<AppState>().toggleDarkMode(value),
+              activeThumbColor: AppColors.accent,
             ),
           ),
           const Divider(),
@@ -40,8 +41,9 @@ class SettingsPage extends StatelessWidget {
             subtitle: state.notificationsEnabled ? 'Включены' : 'Выключены',
             trailing: Switch(
               value: state.notificationsEnabled,
-              onChanged: (value) => context.read<AppState>().toggleNotifications(value),
-              activeColor: AppColors.accent,
+              onChanged: (value) =>
+                  context.read<AppState>().toggleNotifications(value),
+              activeThumbColor: AppColors.accent,
             ),
           ),
           const Divider(),
@@ -49,14 +51,19 @@ class SettingsPage extends StatelessWidget {
             icon: Icons.info_rounded,
             title: 'О приложении',
             subtitle: 'Версия 1.0.0',
-            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textMuted,
+            ),
             onTap: () {
               showAboutDialog(
                 context: context,
                 applicationName: 'PlannerApp',
                 applicationVersion: '1.0.0',
                 children: const [
-                  Text('Приложение с геймификацией для планирования задач и привычек.'),
+                  Text(
+                    'Приложение с геймификацией для планирования задач и привычек.',
+                  ),
                 ],
               );
             },
@@ -87,7 +94,10 @@ class _SettingsTile extends StatelessWidget {
     final tile = ListTile(
       leading: Icon(icon, color: AppColors.accent),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-      subtitle: Text(subtitle, style: const TextStyle(color: AppColors.textMuted)),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: AppColors.textMuted),
+      ),
       trailing: trailing,
     );
 

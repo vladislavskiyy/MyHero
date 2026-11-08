@@ -37,7 +37,8 @@ class _CalendarPageState extends State<CalendarPage> {
     final pending = dayTasks.where((t) => !t.isDone).toList();
     final completed = dayTasks.where((t) => t.isDone).toList();
 
-    final headerDateText = '${selectedDate.day}.${selectedDate.month}.${selectedDate.year}';
+    final headerDateText =
+        '${selectedDate.day}.${selectedDate.month}.${selectedDate.year}';
     final totalForDay = dayTasks.length;
 
     return Scaffold(
@@ -72,20 +73,14 @@ class _CalendarPageState extends State<CalendarPage> {
                     titleCentered: true,
                     leftChevronIcon: const Icon(Icons.chevron_left_rounded),
                     rightChevronIcon: const Icon(Icons.chevron_right_rounded),
-                    titleTextStyle: Theme.of(context).textTheme.titleMedium!.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
+                    titleTextStyle: Theme.of(context).textTheme.titleMedium!
+                        .copyWith(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   daysOfWeekStyle: DaysOfWeekStyle(
-                    weekdayStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                    weekendStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
+                    weekdayStyle: Theme.of(context).textTheme.bodyMedium!
+                        .copyWith(fontWeight: FontWeight.w700, fontSize: 12),
+                    weekendStyle: Theme.of(context).textTheme.bodyMedium!
+                        .copyWith(fontWeight: FontWeight.w700, fontSize: 12),
                   ),
                   calendarStyle: CalendarStyle(
                     outsideDaysVisible: false,
@@ -122,18 +117,26 @@ class _CalendarPageState extends State<CalendarPage> {
                       if (events.isEmpty) return const SizedBox.shrink();
                       final dots = events.take(3).map((e) {
                         final task = e;
-                        final color = (task.category?.isNotEmpty ?? false) ? task.color : AppColors.textMuted;
+                        final color = (task.category?.isNotEmpty ?? false)
+                            ? task.color
+                            : AppColors.textMuted;
                         return Container(
                           width: 6,
                           height: 6,
                           margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
                         );
                       }).toList();
 
                       return Positioned(
                         bottom: 6,
-                        child: Row(mainAxisSize: MainAxisSize.min, children: dots),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: dots,
+                        ),
                       );
                     },
                   ),
@@ -150,7 +153,10 @@ class _CalendarPageState extends State<CalendarPage> {
                   borderRadius: BorderRadius.circular(AppRadii.xl),
                   border: Border.all(color: AppColors.border),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -161,7 +167,11 @@ class _CalendarPageState extends State<CalendarPage> {
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.border),
                       ),
-                      child: const Icon(Icons.event_available_rounded, color: AppColors.accent, size: 20),
+                      child: const Icon(
+                        Icons.event_available_rounded,
+                        color: AppColors.accent,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -196,28 +206,30 @@ class _CalendarPageState extends State<CalendarPage> {
                   children: [
                     if (pending.isEmpty && completed.isEmpty) ...[
                       const SizedBox(height: 28),
-                      _EmptyState(
-                        onCreate: () => showTaskDialog(context),
-                      ),
+                      _EmptyState(onCreate: () => showTaskDialog(context)),
                       const SizedBox(height: 16),
                     ] else ...[
                       for (final t in pending) _buildTaskTile(st, t),
                       if (completed.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         Theme(
-                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          data: Theme.of(
+                            context,
+                          ).copyWith(dividerColor: Colors.transparent),
                           child: ExpansionTile(
                             tilePadding: EdgeInsets.zero,
                             childrenPadding: const EdgeInsets.only(bottom: 6),
                             title: Text(
                               'Выполненные (${completed.length})',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
                                     fontSize: 14.5,
                                     color: AppColors.textMuted,
                                   ),
                             ),
                             initiallyExpanded: _completedExpanded,
-                            onExpansionChanged: (e) => setState(() => _completedExpanded = e),
+                            onExpansionChanged: (e) =>
+                                setState(() => _completedExpanded = e),
                             children: [
                               for (final t in completed) _buildTaskTile(st, t),
                             ],
@@ -237,7 +249,9 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _buildTaskTile(AppState st, Task t) {
-    final subtitle = t.date != null ? '${t.date!.day}.${t.date!.month}.${t.date!.year}' : null;
+    final subtitle = t.date != null
+        ? '${t.date!.day}.${t.date!.month}.${t.date!.year}'
+        : null;
 
     return Dismissible(
       key: ValueKey(t.key ?? t.hashCode),
@@ -247,7 +261,9 @@ class _CalendarPageState extends State<CalendarPage> {
         decoration: BoxDecoration(
           color: const Color(0xFFEF4444).withAlpha((0.12 * 255).round()),
           borderRadius: BorderRadius.circular(AppRadii.xl),
-          border: Border.all(color: const Color(0xFFEF4444).withAlpha((0.25 * 255).round())),
+          border: Border.all(
+            color: const Color(0xFFEF4444).withAlpha((0.25 * 255).round()),
+          ),
         ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
@@ -266,7 +282,10 @@ class _CalendarPageState extends State<CalendarPage> {
           border: Border.all(color: AppColors.border),
         ),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 6,
+          ),
           leading: Checkbox(
             value: t.isDone,
             onChanged: (v) => st.toggleDone(t, v),
@@ -285,7 +304,10 @@ class _CalendarPageState extends State<CalendarPage> {
               ? null
               : Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
+                  ),
                 ),
           trailing: IconButton(
             icon: const Icon(Icons.edit_rounded, color: AppColors.accent),

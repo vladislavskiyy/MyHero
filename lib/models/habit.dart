@@ -5,7 +5,7 @@ import 'package:hive/hive.dart';
 
 part 'habit.g.dart';
 
-@HiveType(typeId: 0)  
+@HiveType(typeId: 0)
 class Habit extends HiveObject {
   @HiveField(0)
   String id;
@@ -43,7 +43,7 @@ class Habit extends HiveObject {
   }) : completedDates = completedDates ?? [];
 
   Color get color => Color(colorValue);
-  set color(Color c) => colorValue = c.value;
+  set color(Color c) => colorValue = c.toARGB32();
 
   IconData get icon => IconData(iconCodePoint, fontFamily: iconFontFamily);
   set icon(IconData i) {
@@ -51,14 +51,15 @@ class Habit extends HiveObject {
     iconFontFamily = i.fontFamily ?? '';
   }
 
-  bool isDoneOn(DateTime day) =>
-      completedDates.any((d) =>
-          d.year == day.year && d.month == day.month && d.day == day.day);
+  bool isDoneOn(DateTime day) => completedDates.any(
+    (d) => d.year == day.year && d.month == day.month && d.day == day.day,
+  );
 
   void toggleDay(DateTime day) {
     if (isDoneOn(day)) {
-      completedDates.removeWhere((d) =>
-          d.year == day.year && d.month == day.month && d.day == day.day);
+      completedDates.removeWhere(
+        (d) => d.year == day.year && d.month == day.month && d.day == day.day,
+      );
     } else {
       completedDates.add(day);
     }

@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
+import 'firebase_options.dart';
+import 'firebase_runtime_config.dart';
 import 'services/notification_service.dart';
 import 'services/auth_service.dart';
 import 'state/app_state.dart';
@@ -23,7 +27,6 @@ import 'pages/scheduler_page.dart';
 import 'pages/login_page.dart';
 import 'pages/signup_page.dart';
 import 'pages/today_page.dart';
-import 'pages/onboarding_page.dart';
 
 // ✅ ДОБАВЬ
 import 'pages/ai_companion_page.dart';
@@ -61,6 +64,26 @@ Future<Uint8List> _loadOrCreateHiveKey() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  if (kIsWeb) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    if (webRecaptchaEnterpriseSiteKey.isNotEmpty) {
+      await FirebaseAppCheck.instance.activate(
+        providerWeb: ReCaptchaEnterpriseProvider(webRecaptchaEnterpriseSiteKey),
+      );
+    }
+  } else if (defaultTargetPlatform == TargetPlatform.android) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    await FirebaseAppCheck.instance.activate(
+      providerAndroid: kDebugMode
+          ? const AndroidDebugProvider()
+          : const AndroidPlayIntegrityProvider(),
+    );
+  }
+
   await Hive.initFlutter();
 
   await AuthService.init();
@@ -80,7 +103,10 @@ Future<void> main() async {
   await Hive.openBox<Task>('tasks', encryptionCipher: hiveCipher);
   await Hive.openBox<Habit>('habits', encryptionCipher: hiveCipher);
   await Hive.openBox<TaskList>('task_lists', encryptionCipher: hiveCipher);
-  await Hive.openBox<JournalEntry>('journal_entries', encryptionCipher: hiveCipher);
+  await Hive.openBox<JournalEntry>(
+    'journal_entries',
+    encryptionCipher: hiveCipher,
+  );
   await Hive.openBox<Achievement>('achievements', encryptionCipher: hiveCipher);
   await Hive.openBox('settings', encryptionCipher: hiveCipher);
   await Hive.openBox<Map>('day_plans', encryptionCipher: hiveCipher);
@@ -102,7 +128,8 @@ class PlannerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final box = Hive.box('settings');
-    final hasSeenOnboarding = box.get('seenOnboarding', defaultValue: false) as bool;
+    final hasSeenOnboarding =
+        box.get('seenOnboarding', defaultValue: false) as bool;
 
     return MaterialApp(
       title: 'Planner',
@@ -149,12 +176,19 @@ class OnboardingPage extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.accent, AppColors.accent.withAlpha((0.72 * 255).round())],
+                    colors: [
+                      AppColors.accent,
+                      AppColors.accent.withAlpha((0.72 * 255).round()),
+                    ],
                   ),
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: AppShadows.card,
                 ),
-                child: const Icon(Icons.auto_awesome_rounded, size: 52, color: Colors.white),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 52,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -174,9 +208,7 @@ class OnboardingPage extends StatelessWidget {
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const MainPage(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const MainPage()),
                     );
                   },
                   child: const Text('Start'),
@@ -216,10 +248,7 @@ class _MainPageState extends State<MainPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
 
       bottomNavigationBar: SafeArea(
         top: false,
@@ -240,7 +269,9 @@ class _MainPageState extends State<MainPage> {
                 elevation: 0,
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: _onNavTap,
-                indicatorColor: AppColors.accent.withAlpha((0.14 * 255).round()),
+                indicatorColor: AppColors.accent.withAlpha(
+                  (0.14 * 255).round(),
+                ),
                 destinations: const [
                   NavigationDestination(
                     icon: Icon(Icons.today_outlined),

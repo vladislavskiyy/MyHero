@@ -18,7 +18,9 @@ class TodayPage extends StatefulWidget {
 }
 
 class _TodayPageState extends State<TodayPage> {
-  final TextEditingController _planMinutesController = TextEditingController(text: '120');
+  final TextEditingController _planMinutesController = TextEditingController(
+    text: '120',
+  );
   Map<String, dynamic>? _planProposal;
 
   @override
@@ -31,7 +33,11 @@ class _TodayPageState extends State<TodayPage> {
     final appState = context.read<AppState>();
     final minutes = int.tryParse(_planMinutesController.text) ?? 120;
     final tasks = appState.lists.expand((list) => list.tasks).toList();
-    final proposal = appState.generatePlanForDay(DateTime.now(), minutes, tasks: tasks);
+    final proposal = appState.generatePlanForDay(
+      DateTime.now(),
+      minutes,
+      tasks: tasks,
+    );
     setState(() => _planProposal = proposal);
   }
 
@@ -50,21 +56,25 @@ class _TodayPageState extends State<TodayPage> {
     final st = context.watch<AppState>();
     final today = DateTime.now();
 
-    final tasksForToday = st.lists
-        .expand((list) => list.tasks)
-        .where((task) => task.date != null && task.appearsOn(today))
-        .toList()
-      ..sort((a, b) {
-        if (a.isDone != b.isDone) return a.isDone ? 1 : -1;
-        final aPriority = a.priority ?? 0;
-        final bPriority = b.priority ?? 0;
-        if (aPriority != bPriority) return bPriority.compareTo(aPriority);
-        return (a.title).toLowerCase().compareTo(b.title.toLowerCase());
-      });
+    final tasksForToday =
+        st.lists
+            .expand((list) => list.tasks)
+            .where((task) => task.date != null && task.appearsOn(today))
+            .toList()
+          ..sort((a, b) {
+            if (a.isDone != b.isDone) return a.isDone ? 1 : -1;
+            final aPriority = a.priority ?? 0;
+            final bPriority = b.priority ?? 0;
+            if (aPriority != bPriority) return bPriority.compareTo(aPriority);
+            return (a.title).toLowerCase().compareTo(b.title.toLowerCase());
+          });
 
     final pending = tasksForToday.where((task) => !task.isDone).toList();
     final completed = tasksForToday.where((task) => task.isDone).toList();
-    final habitsForToday = st.habits.where((habit) => !habit.isDoneOn(today)).take(3).toList();
+    final habitsForToday = st.habits
+        .where((habit) => !habit.isDoneOn(today))
+        .take(3)
+        .toList();
     final selectedTasks = _planProposal == null
         ? <Task>[]
         : st.tasksForPlan(_planProposal!);
@@ -119,19 +129,25 @@ class _TodayPageState extends State<TodayPage> {
                           width: 42,
                           height: 42,
                           decoration: BoxDecoration(
-                            color: AppColors.accent.withAlpha((0.14 * 255).round()),
+                            color: AppColors.accent.withAlpha(
+                              (0.14 * 255).round(),
+                            ),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Icon(Icons.auto_awesome_rounded, color: AppColors.accent),
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: AppColors.accent,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'План на сегодня',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.textPrimary,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.textPrimary,
+                                ),
                           ),
                         ),
                       ],
@@ -143,12 +159,15 @@ class _TodayPageState extends State<TodayPage> {
                       decoration: InputDecoration(
                         hintText: 'Доступно минут',
                         hintStyle: TextStyle(
-                          color: AppColors.textMuted.withOpacity(0.55),
+                          color: AppColors.textMuted.withValues(alpha: 0.55),
                           fontWeight: FontWeight.w500,
                         ),
                         filled: true,
                         fillColor: AppColors.pageBg,
-                        prefixIcon: const Icon(Icons.timer_rounded, color: AppColors.textMuted),
+                        prefixIcon: const Icon(
+                          Icons.timer_rounded,
+                          color: AppColors.textMuted,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                           borderSide: BorderSide(color: AppColors.border),
@@ -159,9 +178,15 @@ class _TodayPageState extends State<TodayPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: AppColors.accent, width: 1.5),
+                          borderSide: BorderSide(
+                            color: AppColors.accent,
+                            width: 1.5,
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 14,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -177,7 +202,9 @@ class _TodayPageState extends State<TodayPage> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _planProposal == null ? null : () => _savePlan(context),
+                            onPressed: _planProposal == null
+                                ? null
+                                : () => _savePlan(context),
                             icon: const Icon(Icons.save_rounded),
                             label: const Text('Сохранить'),
                           ),
@@ -198,24 +225,35 @@ class _TodayPageState extends State<TodayPage> {
                           children: [
                             Text(
                               'Рекомендовано: ${_planProposal!['selectedTaskIds'].length} задач · ${_planProposal!['usedMinutes']} мин',
-                              style: const TextStyle(fontWeight: FontWeight.w800),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                             const SizedBox(height: 8),
                             if (selectedTasks.isEmpty)
-                              const Text('В план не вошло ничего — попробуйте увеличить время.')
+                              const Text(
+                                'В план не вошло ничего — попробуйте увеличить время.',
+                              )
                             else
                               ...selectedTasks.map(
                                 (task) => Padding(
                                   padding: const EdgeInsets.only(bottom: 6),
                                   child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(Icons.check_circle_rounded, size: 18, color: AppColors.accent),
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 18,
+                                        color: AppColors.accent,
+                                      ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           task.title,
-                                          style: const TextStyle(fontWeight: FontWeight.w700),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -248,7 +286,10 @@ class _TodayPageState extends State<TodayPage> {
                       boxShadow: AppShadows.card,
                     ),
                     child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       leading: Container(
                         width: 42,
                         height: 42,
@@ -263,9 +304,8 @@ class _TodayPageState extends State<TodayPage> {
                       ),
                       title: Text(
                         habit.title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w800),
                       ),
                       subtitle: Text(
                         '${st.habitCurrentStreak(habit)} дней подряд',
@@ -276,10 +316,17 @@ class _TodayPageState extends State<TodayPage> {
                         onChanged: (_) async {
                           final wasDone = habit.isDoneOn(today);
                           await st.toggleHabitDay(habit, today);
-                          if (!wasDone && st.habits.any((h) => h.id == habit.id && h.isDoneOn(today))) {
+                          if (!wasDone &&
+                              st.habits.any(
+                                (h) => h.id == habit.id && h.isDoneOn(today),
+                              )) {
                             ScaffoldMessenger.of(context)
                               ..clearSnackBars()
-                              ..showSnackBar(const SnackBar(content: Text('+2 XP за привычку!')));
+                              ..showSnackBar(
+                                const SnackBar(
+                                  content: Text('+2 XP за привычку!'),
+                                ),
+                              );
                           }
                         },
                         activeColor: habit.color,
@@ -292,14 +339,13 @@ class _TodayPageState extends State<TodayPage> {
 
               _SectionHeader(
                 title: 'Задачи на сегодня',
-                subtitle: '${pending.length} активных · ${completed.length} готово',
+                subtitle:
+                    '${pending.length} активных · ${completed.length} готово',
               ),
               const SizedBox(height: 8),
 
               if (pending.isEmpty && completed.isEmpty)
-                _EmptyTodayState(
-                  onAdd: () => showTaskDialog(context),
-                )
+                _EmptyTodayState(onAdd: () => showTaskDialog(context))
               else ...[
                 if (pending.isNotEmpty)
                   ...pending.map(
@@ -311,7 +357,9 @@ class _TodayPageState extends State<TodayPage> {
                         if (!wasDone && (value ?? false)) {
                           ScaffoldMessenger.of(context)
                             ..clearSnackBars()
-                            ..showSnackBar(const SnackBar(content: Text('+5 XP за задачу!')));
+                            ..showSnackBar(
+                              const SnackBar(content: Text('+5 XP за задачу!')),
+                            );
                         }
                       },
                       (tk) => showTaskDialog(context, task: tk),
@@ -337,7 +385,9 @@ class _TodayPageState extends State<TodayPage> {
                         if (!wasDone && (value ?? false)) {
                           ScaffoldMessenger.of(context)
                             ..clearSnackBars()
-                            ..showSnackBar(const SnackBar(content: Text('+5 XP за задачу!')));
+                            ..showSnackBar(
+                              const SnackBar(content: Text('+5 XP за задачу!')),
+                            );
                         }
                       },
                       (tk) => showTaskDialog(context, task: tk),
@@ -435,14 +485,21 @@ class _TodaySummaryCard extends StatelessWidget {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withAlpha((0.12 * 255).round()),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.bolt_rounded, color: Colors.white, size: 16),
+                      const Icon(
+                        Icons.bolt_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         'Lv.$level',
@@ -580,10 +637,7 @@ class _SectionHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionHeader({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionHeader({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -630,14 +684,18 @@ class _EmptyTodayState extends StatelessWidget {
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: AppColors.border),
             ),
-            child: const Icon(Icons.checklist_rounded, size: 30, color: AppColors.accent),
+            child: const Icon(
+              Icons.checklist_rounded,
+              size: 30,
+              color: AppColors.accent,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             'На сегодня задач нет',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 6),
           Text(

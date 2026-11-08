@@ -18,7 +18,6 @@ import 'habit_tracker_page.dart';
 import 'journal_page.dart';
 import 'scheduler_page.dart';
 import 'inbox_page.dart';
-import 'calendar_page.dart';
 
 class ToolsOverviewPage extends StatelessWidget {
   const ToolsOverviewPage({super.key});
@@ -130,13 +129,17 @@ class ToolsOverviewPage extends StatelessWidget {
             children: [
               _HeaderCard(
                 title: 'Выберите инструмент',
-                subtitle: 'Соберите задачи в Inbox и двигайтесь дальше: списки, привычки, дневник и план дня.',
+                subtitle:
+                    'Соберите задачи в Inbox и двигайтесь дальше: списки, привычки, дневник и план дня.',
                 level: st.level,
                 xp: st.xpBalance,
                 coins: st.coins,
                 progress: (st.xpRequiredForNextLevel == 0)
                     ? 0
-                    : (st.xpProgressInLevel / st.xpRequiredForNextLevel).clamp(0.0, 1.0),
+                    : (st.xpProgressInLevel / st.xpRequiredForNextLevel).clamp(
+                        0.0,
+                        1.0,
+                      ),
               ),
               const SizedBox(height: 14),
 
@@ -250,7 +253,10 @@ class _HeaderCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppColors.border),
                         ),
-                        child: const Icon(Icons.grid_view_rounded, color: AppColors.accent),
+                        child: const Icon(
+                          Icons.grid_view_rounded,
+                          color: AppColors.accent,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -259,7 +265,8 @@ class _HeaderCard extends StatelessWidget {
                           children: [
                             Text(
                               title,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.textPrimary,
                                   ),
@@ -267,7 +274,8 @@ class _HeaderCard extends StatelessWidget {
                             const SizedBox(height: 3),
                             Text(
                               subtitle,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
                                     color: AppColors.textMuted,
                                     fontWeight: FontWeight.w500,
                                     fontSize: 12.5,
@@ -286,7 +294,10 @@ class _HeaderCard extends StatelessWidget {
                       const SizedBox(width: 8),
                       _StatChip(icon: Icons.star_rounded, label: '$xp XP'),
                       const SizedBox(width: 8),
-                      _StatChip(icon: Icons.monetization_on_rounded, label: '$coins'),
+                      _StatChip(
+                        icon: Icons.monetization_on_rounded,
+                        label: '$coins',
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -297,7 +308,9 @@ class _HeaderCard extends StatelessWidget {
                       value: progress,
                       minHeight: 10,
                       backgroundColor: AppColors.border,
-                      valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+                      valueColor: const AlwaysStoppedAnimation(
+                        AppColors.accent,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -305,9 +318,9 @@ class _HeaderCard extends StatelessWidget {
                     'До следующего уровня: ${(100 * (1 - progress)).clamp(0, 100).round()}%',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMuted,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -423,10 +436,14 @@ class _ToolCard extends StatelessWidget {
                             width: 34,
                             height: 34,
                             decoration: BoxDecoration(
-                              color: Colors.white.withAlpha((0.18 * 255).round()),
+                              color: Colors.white.withAlpha(
+                                (0.18 * 255).round(),
+                              ),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: Colors.white.withAlpha((0.22 * 255).round()),
+                                color: Colors.white.withAlpha(
+                                  (0.22 * 255).round(),
+                                ),
                               ),
                             ),
                             child: Icon(icon, color: Colors.white, size: 19),
@@ -441,7 +458,8 @@ class _ToolCard extends StatelessWidget {
                       const Spacer(),
                       Text(
                         title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
                               letterSpacing: -0.2,
@@ -453,21 +471,26 @@ class _ToolCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white.withAlpha((0.88 * 255).round()),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12.2,
-                            ),
+                          color: Colors.white.withAlpha((0.88 * 255).round()),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.2,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.bottomLeft,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withAlpha((0.18 * 255).round()),
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: Colors.white.withAlpha((0.22 * 255).round()),
+                              color: Colors.white.withAlpha(
+                                (0.22 * 255).round(),
+                              ),
                             ),
                           ),
                           child: Text(

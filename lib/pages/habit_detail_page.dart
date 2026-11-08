@@ -13,7 +13,7 @@ class HabitDetailPage extends StatefulWidget {
   static const routeName = '/habit_detail';
 
   final Habit habit;
-  const HabitDetailPage({Key? key, required this.habit}) : super(key: key);
+  const HabitDetailPage({super.key, required this.habit});
 
   @override
   State<HabitDetailPage> createState() => _HabitDetailPageState();
@@ -74,7 +74,8 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                         children: [
                           Text(
                             'Статистика',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
                                   fontWeight: FontWeight.w900,
                                   color: AppColors.textPrimary,
                                 ),
@@ -136,19 +137,28 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                     headerStyle: HeaderStyle(
                       formatButtonVisible: false,
                       titleCentered: true,
-                      titleTextStyle: Theme.of(context).textTheme.titleMedium!.copyWith(
+                      titleTextStyle: Theme.of(context).textTheme.titleMedium!
+                          .copyWith(
                             fontWeight: FontWeight.w900,
                             color: AppColors.textPrimary,
                           ),
-                      leftChevronIcon: const Icon(Icons.chevron_left_rounded, color: AppColors.textMuted),
-                      rightChevronIcon: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                      leftChevronIcon: const Icon(
+                        Icons.chevron_left_rounded,
+                        color: AppColors.textMuted,
+                      ),
+                      rightChevronIcon: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.textMuted,
+                      ),
                     ),
                     daysOfWeekStyle: DaysOfWeekStyle(
-                      weekdayStyle: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      weekdayStyle: Theme.of(context).textTheme.bodySmall!
+                          .copyWith(
                             color: AppColors.textMuted,
                             fontWeight: FontWeight.w700,
                           ),
-                      weekendStyle: Theme.of(context).textTheme.bodySmall!.copyWith(
+                      weekendStyle: Theme.of(context).textTheme.bodySmall!
+                          .copyWith(
                             color: AppColors.textMuted,
                             fontWeight: FontWeight.w700,
                           ),
@@ -160,16 +170,30 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                       todayDecoration: BoxDecoration(
                         color: h.color.withAlpha((0.18 * 255).round()),
                         shape: BoxShape.circle,
-                        border: Border.all(color: h.color.withAlpha((0.35 * 255).round())),
+                        border: Border.all(
+                          color: h.color.withAlpha((0.35 * 255).round()),
+                        ),
                       ),
                       selectedDecoration: BoxDecoration(
                         color: h.color,
                         shape: BoxShape.circle,
                       ),
-                      defaultTextStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
-                      weekendTextStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700),
-                      selectedTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                      todayTextStyle: TextStyle(color: h.color, fontWeight: FontWeight.w900),
+                      defaultTextStyle: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      weekendTextStyle: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      selectedTextStyle: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                      todayTextStyle: TextStyle(
+                        color: h.color,
+                        fontWeight: FontWeight.w900,
+                      ),
 
                       markerSize: 6,
                       markerDecoration: BoxDecoration(
@@ -189,9 +213,15 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                             decoration: BoxDecoration(
                               color: h.color.withAlpha((0.18 * 255).round()),
                               shape: BoxShape.circle,
-                              border: Border.all(color: h.color.withAlpha((0.35 * 255).round())),
+                              border: Border.all(
+                                color: h.color.withAlpha((0.35 * 255).round()),
+                              ),
                             ),
-                            child: Icon(Icons.check_rounded, size: 12, color: h.color),
+                            child: Icon(
+                              Icons.check_rounded,
+                              size: 12,
+                              color: h.color,
+                            ),
                           ),
                         );
                       },
@@ -204,7 +234,10 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
 
               // Footer hint
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.pageBg,
                   borderRadius: BorderRadius.circular(AppRadii.xl),
@@ -212,15 +245,18 @@ class _HabitDetailPageState extends State<HabitDetailPage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded, color: AppColors.textMuted),
+                    Icon(
+                      Icons.info_outline_rounded,
+                      color: AppColors.textMuted,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Нажми на день, чтобы отметить выполнение привычки.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textMuted,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),

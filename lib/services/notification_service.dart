@@ -1,7 +1,5 @@
 // lib/services/notification_service.dart
 
-import 'dart:io';
-
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -25,7 +23,9 @@ class NotificationService {
     try {
       tz.initializeTimeZones();
 
-      const androidInitSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidInitSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
       const iosInitSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -68,7 +68,10 @@ class NotificationService {
     if (!_initialized) return;
 
     try {
-      final tz.TZDateTime scheduledTZ = tz.TZDateTime.from(scheduledDate, tz.local);
+      final tz.TZDateTime scheduledTZ = tz.TZDateTime.from(
+        scheduledDate,
+        tz.local,
+      );
       if (scheduledTZ.isBefore(tz.TZDateTime.now(tz.local))) return;
 
       await _flutterLocalNotificationsPlugin.zonedSchedule(
