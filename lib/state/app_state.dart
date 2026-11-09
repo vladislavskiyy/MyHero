@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../models/task.dart';
+import '../models/day_plan_review.dart';
 import '../models/task_list.dart';
 import '../models/achievement.dart';
 import '../models/habit.dart';
@@ -53,17 +54,250 @@ class AppState extends ChangeNotifier {
 
   // ================== Daily plan / analytics ==================
 
+  static const maxPlanMinutes = 24 * 60;
+
+  final Map<String, Map<String, dynamic>> _planDrafts = {};
+  final Set<String> _savingPlanDays = {};
+
+  String _planKey(DateTime day) =>
+      'day_${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+
+  Map<String, dynamic> _copyPlan(Map plan) =>
+      Map<String, dynamic>.from(jsonDecode(jsonEncode(plan)) as Map);
+
+  DateTime _planDate(Map<String, dynamic> plan) {
+    final day = DateTime.tryParse(plan['date'] as String? ?? '');
+    if (day == null) throw ArgumentError('У плана не указана корректная дата.');
+    return DateUtils.dateOnly(day);
+  }
+
+  List<String> _planIds(Map<String, dynamic> plan) =>
+      (plan['selectedTaskIds'] as List? ?? [])
+          .whereType<String>()
+          .toSet()
+          .toList();
+
+  DateTime _savedTime(Map plan) =>
+      DateTime.tryParse(plan['savedAt'] as String? ?? '') ??
+      DateTime.tryParse(plan['generatedAt'] as String? ?? '') ??
+      DateTime(1970);
+
   List<Map<String, dynamic>> get savedPlans {
-    final plans = _dayPlansBox.values
-        .whereType<Map>()
-        .map((entry) => Map<String, dynamic>.from(entry))
+    final latest = <String, Map<String, dynamic>>{};
+    for (final value in _dayPlansBox.values) {
+      final plan = _copyPlan(value);
+      if (plan['status'] != 'saved' && plan['status'] != 'accepted') continue;
+      final day = DateTime.tryParse(plan['date'] as String? ?? '');
+      if (day == null) continue;
+      final key = _planKey(day);
+      final previous = latest[key];
+      if (previous == null ||
+          !_savedTime(plan).isBefore(_savedTime(previous))) {
+        latest[key] = plan;
+      }
+    }
+    return latest.values.toList()
+      ..sort((a, b) => _planDate(b).compareTo(_planDate(a)));
+  }
+
+  Map<String, dynamic>? acceptedPlanForDay(DateTime day) {
+    for (final plan in savedPlans) {
+      if (DateUtils.isSameDay(_planDate(plan), day)) return plan;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? planDraftForDay(DateTime day) {
+    final draft = _planDrafts[_planKey(day)];
+    return draft == null ? null : _copyPlan(draft);
+  }
+
+  bool isSavingPlan(DateTime day) => _savingPlanDays.contains(_planKey(day));
+
+  bool _isPlanCandidate(Task task, DateTime day) {
+    if (task.isDone) return false;
+    final date = task.date;
+    if (date == null) return true;
+    if (task.recurrenceType != TaskRecurrenceType.none) {
+      return task.appearsOn(day);
+    }
+    return !DateUtils.dateOnly(date).isAfter(DateUtils.dateOnly(day));
+  }
+
+  List<Task> candidatesForPlan(DateTime day) {
+    final unique = <String, Task>{};
+    for (final task in lists.expand((list) => list.tasks)) {
+      if (_isPlanCandidate(task, day)) unique.putIfAbsent(task.id, () => task);
+    }
+    return unique.values.toList();
+  }
+
+  Map<String, dynamic> _taskSnapshot(Task task) => {
+    'title': task.title,
+    'durationMinutes': task.effectiveDurationMinutes,
+    'date': task.date == null
+        ? null
+        : DateUtils.dateOnly(task.date!).toIso8601String(),
+    'deadline': task.deadline == null
+        ? null
+        : DateUtils.dateOnly(task.deadline!).toIso8601String(),
+    'recurrenceType': task.recurrenceType.index,
+    'priority': task.priority,
+  };
+
+  DayPlanReview reviewPlan(Map<String, dynamic> plan) {
+    final day = _planDate(plan);
+    final allTasks = {
+      for (final task in lists.expand((list) => list.tasks)) task.id: task,
+    };
+    final ids = _planIds(plan);
+    final titles = (plan['selectedTitles'] as List? ?? [])
+        .whereType<String>()
         .toList();
-    plans.sort((a, b) {
-      final aDate = DateTime.tryParse((a['date'] as String? ?? '1970-01-01')) ?? DateTime(1970);
-      final bDate = DateTime.tryParse((b['date'] as String? ?? '1970-01-01')) ?? DateTime(1970);
-      return bDate.compareTo(aDate);
+    final snapshots = plan['taskSnapshots'] as Map? ?? {};
+    final entries = <PlanTaskEntry>[];
+    for (var i = 0; i < ids.length; i++) {
+      final id = ids[i];
+      final task = allTasks[id];
+      final snapshot = snapshots[id] as Map?;
+      final oldTitle =
+          snapshot?['title'] as String? ??
+          (i < titles.length ? titles[i] : 'Удалённая задача');
+      entries.add(
+        PlanTaskEntry(
+          id: id,
+          task: task,
+          title: task?.title ?? oldTitle,
+          durationMinutes:
+              task?.effectiveDurationMinutes ??
+              (snapshot?['durationMinutes'] as int? ?? 0),
+          hasChanged:
+              task != null &&
+              (snapshot == null
+                  ? oldTitle != task.title
+                  : jsonEncode(snapshot) != jsonEncode(_taskSnapshot(task))),
+          isAvailable:
+              task != null && (task.isDone || _isPlanCandidate(task, day)),
+        ),
+      );
+    }
+    return DayPlanReview(
+      entries: entries,
+      availableMinutes: plan['availableMinutes'] as int? ?? 0,
+      savedUsedMinutes: plan['usedMinutes'] as int?,
+    );
+  }
+
+  List<Task> remainingTasksForPlan(Map<String, dynamic> plan) {
+    final ids = _planIds(plan).toSet();
+    return candidatesForPlan(
+      _planDate(plan),
+    ).where((task) => !ids.contains(task.id)).toList();
+  }
+
+  void generatePlanDraft(DateTime day, int availableMinutes) {
+    if (isSavingPlan(day)) return;
+    _planDrafts[_planKey(day)] = generatePlanForDay(day, availableMinutes);
+    notifyListeners();
+  }
+
+  void editAcceptedPlan(DateTime day) {
+    if (isSavingPlan(day) || _planDrafts.containsKey(_planKey(day))) return;
+    final plan = acceptedPlanForDay(day);
+    if (plan == null) return;
+    _planDrafts[_planKey(day)] = _copyPlan(plan)..['status'] = 'proposed';
+    notifyListeners();
+  }
+
+  void discardPlanDraft(DateTime day) {
+    if (isSavingPlan(day)) return;
+    _planDrafts.remove(_planKey(day));
+    notifyListeners();
+  }
+
+  void _editPlanDraft(DateTime day, void Function(Map<String, dynamic>) edit) {
+    if (isSavingPlan(day)) return;
+    final existing = _planDrafts[_planKey(day)] ?? acceptedPlanForDay(day);
+    if (existing == null) return;
+    final draft = _copyPlan(existing)..['status'] = 'proposed';
+    // Preserve the ID/title mapping of older plans before moving entries.
+    final snapshots = Map<String, dynamic>.from(
+      draft['taskSnapshots'] as Map? ?? {},
+    );
+    for (final entry in reviewPlan(existing).entries) {
+      snapshots.putIfAbsent(
+        entry.id,
+        () => entry.task == null
+            ? {'title': entry.title, 'durationMinutes': entry.durationMinutes}
+            : _taskSnapshot(entry.task!),
+      );
+    }
+    draft['taskSnapshots'] = snapshots;
+    edit(draft);
+    final review = reviewPlan(draft);
+    draft['selectedTaskIds'] = review.entries.map((entry) => entry.id).toList();
+    draft['selectedTitles'] = review.entries
+        .map((entry) => entry.title)
+        .toList();
+    draft['usedMinutes'] = review.usedMinutes;
+    final remaining = remainingTasksForPlan(draft);
+    draft['droppedTaskIds'] = remaining.map((task) => task.id).toList();
+    draft['droppedTitles'] = remaining.map((task) => task.title).toList();
+    _planDrafts[_planKey(day)] = draft;
+    notifyListeners();
+  }
+
+  void setPlanBudget(DateTime day, int minutes) {
+    RangeError.checkValueInInterval(
+      minutes,
+      1,
+      maxPlanMinutes,
+      'availableMinutes',
+    );
+    _editPlanDraft(day, (draft) => draft['availableMinutes'] = minutes);
+  }
+
+  void removeTaskFromPlan(DateTime day, String taskId) {
+    _editPlanDraft(
+      day,
+      (draft) => draft['selectedTaskIds'] = _planIds(
+        draft,
+      ).where((id) => id != taskId).toList(),
+    );
+  }
+
+  void addTaskToPlan(DateTime day, String taskId) {
+    final task = candidatesForPlan(
+      day,
+    ).where((task) => task.id == taskId).firstOrNull;
+    if (task == null) {
+      throw StateError('Эта задача больше не подходит выбранному дню.');
+    }
+    _editPlanDraft(day, (draft) {
+      draft['selectedTaskIds'] = {..._planIds(draft), taskId}.toList();
+      final snapshots = Map<String, dynamic>.from(
+        draft['taskSnapshots'] as Map? ?? {},
+      );
+      snapshots.putIfAbsent(taskId, () => _taskSnapshot(task));
+      draft['taskSnapshots'] = snapshots;
     });
-    return plans;
+  }
+
+  void movePlanTask(DateTime day, int from, int to) {
+    _editPlanDraft(day, (draft) {
+      final ids = _planIds(draft);
+      RangeError.checkValidIndex(from, ids, 'from');
+      RangeError.checkValidIndex(to, ids, 'to');
+      final id = ids.removeAt(from);
+      ids.insert(to, id);
+      draft['selectedTaskIds'] = ids;
+    });
+  }
+
+  Future<void> acceptPlanDraft(DateTime day) async {
+    final draft = planDraftForDay(day);
+    if (draft == null) return;
+    await savePlan(draft);
   }
 
   List<Map<String, dynamic>> get analyticsEvents {
@@ -72,8 +306,16 @@ class AppState extends ChangeNotifier {
         .map((entry) => Map<String, dynamic>.from(entry))
         .toList();
     events.sort((a, b) {
-      final aTime = DateTime.tryParse((a['timestamp'] as String? ?? '1970-01-01T00:00:00.000')) ?? DateTime(1970);
-      final bTime = DateTime.tryParse((b['timestamp'] as String? ?? '1970-01-01T00:00:00.000')) ?? DateTime(1970);
+      final aTime =
+          DateTime.tryParse(
+            (a['timestamp'] as String? ?? '1970-01-01T00:00:00.000'),
+          ) ??
+          DateTime(1970);
+      final bTime =
+          DateTime.tryParse(
+            (b['timestamp'] as String? ?? '1970-01-01T00:00:00.000'),
+          ) ??
+          DateTime(1970);
       return bTime.compareTo(aTime);
     });
     return events;
@@ -101,15 +343,32 @@ class AppState extends ChangeNotifier {
     List<Task>? tasks,
     String? notes,
   }) {
-    final candidates = (tasks ?? lists.expand((list) => list.tasks).toList())
-        .where((task) => !task.isDone && task.date != null)
-        .where((task) => task.appearsOn(day) || (task.deadline != null && DateUtils.isSameDay(task.deadline!, day)))
+    if (availableMinutes < 0 || availableMinutes > maxPlanMinutes) {
+      throw RangeError.range(
+        availableMinutes,
+        0,
+        maxPlanMinutes,
+        'availableMinutes',
+      );
+    }
+    final candidates = (tasks ?? candidatesForPlan(day))
+        .where((task) => _isPlanCandidate(task, day))
+        .fold<Map<String, Task>>(
+          {},
+          (unique, task) => unique..putIfAbsent(task.id, () => task),
+        )
+        .values
         .toList();
 
     int urgencyScore(Task task) {
-      final deadline = task.deadline ?? task.date;
+      final deadline = task.deadline;
       if (deadline == null) return 0;
-      final diffDays = deadline.difference(DateTime(day.year, day.month, day.day)).inDays;
+      // Compare calendar dates, regardless of time of day or DST transitions.
+      final diffDays = DateTime.utc(
+        deadline.year,
+        deadline.month,
+        deadline.day,
+      ).difference(DateTime.utc(day.year, day.month, day.day)).inDays;
       if (diffDays <= 0) return 100;
       if (diffDays <= 1) return 80;
       if (diffDays <= 3) return 60;
@@ -119,11 +378,16 @@ class AppState extends ChangeNotifier {
 
     final sorted = [...candidates]
       ..sort((a, b) {
-        final aScore = (a.priority ?? 0) + urgencyScore(a) + (a.effectiveDurationMinutes < 45 ? 10 : 0);
-        final bScore = (b.priority ?? 0) + urgencyScore(b) + (b.effectiveDurationMinutes < 45 ? 10 : 0);
-        final score = bScore.compareTo(aScore);
-        if (score != 0) return score;
-        return a.effectiveDurationMinutes.compareTo(b.effectiveDurationMinutes);
+        final urgency = urgencyScore(b).compareTo(urgencyScore(a));
+        if (urgency != 0) return urgency;
+        final priority = (b.priority ?? 0).compareTo(a.priority ?? 0);
+        if (priority != 0) return priority;
+        // Shorter tasks only win when urgency and user priority are equal.
+        final duration = a.effectiveDurationMinutes.compareTo(
+          b.effectiveDurationMinutes,
+        );
+        if (duration != 0) return duration;
+        return a.id.compareTo(b.id);
       });
 
     final selected = <Task>[];
@@ -137,21 +401,27 @@ class AppState extends ChangeNotifier {
     }
 
     final selectedIds = selected.map((task) => task.id).toList();
-    final dropped = sorted.where((task) => !selectedIds.contains(task.id)).toList();
+    final dropped = sorted
+        .where((task) => !selectedIds.contains(task.id))
+        .toList();
 
     final plan = <String, dynamic>{
-      'id': 'plan_${day.year}${day.month.toString().padLeft(2, '0')}${day.day.toString().padLeft(2, '0')}_${DateTime.now().millisecondsSinceEpoch}',
+      'id':
+          'plan_${day.year}${day.month.toString().padLeft(2, '0')}${day.day.toString().padLeft(2, '0')}_${DateTime.now().millisecondsSinceEpoch}',
       'date': day.toIso8601String(),
       'availableMinutes': availableMinutes,
       'usedMinutes': used,
       'generatedAt': DateTime.now().toIso8601String(),
       'selectedTaskIds': selectedIds,
+      'taskSnapshots': {
+        for (final task in selected) task.id: _taskSnapshot(task),
+      },
       'selectedTitles': selected.map((task) => task.title).toList(),
       'droppedTaskIds': dropped.map((task) => task.id).toList(),
       'droppedTitles': dropped.map((task) => task.title).toList(),
       'status': 'proposed',
       'notes': notes ?? 'Автоподбор задач по доступному времени',
-      'algorithmVersion': 'knapsack-v1',
+      'algorithmVersion': 'priority-greedy-v2',
     };
 
     logAnalyticsEvent('plan_generated', {
@@ -166,18 +436,61 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> savePlan(Map<String, dynamic> plan) async {
-    final normalized = Map<String, dynamic>.from(plan)
-      ..['status'] = 'saved'
-      ..['savedAt'] = DateTime.now().toIso8601String();
-    final id = normalized['id'] as String? ?? 'plan_${DateTime.now().millisecondsSinceEpoch}';
-    normalized['id'] = id;
-    await _dayPlansBox.put(id, normalized);
-    logAnalyticsEvent('plan_saved', {
-      'date': normalized['date'] ?? '',
-      'availableMinutes': normalized['availableMinutes'] ?? 0,
-      'selectedCount': (normalized['selectedTaskIds'] as List? ?? []).length,
-    });
+    final day = _planDate(plan);
+    final key = _planKey(day);
+    if (!_savingPlanDays.add(key)) return;
     notifyListeners();
+    try {
+      final minutes = plan['availableMinutes'] as int? ?? -1;
+      RangeError.checkValueInInterval(
+        minutes,
+        0,
+        maxPlanMinutes,
+        'availableMinutes',
+      );
+      final review = reviewPlan(plan);
+      if (!review.canAccept) {
+        throw StateError(review.blockingMessages.join(' '));
+      }
+      final normalized = _copyPlan(plan)
+        ..['id'] = key
+        ..['date'] = day.toIso8601String()
+        ..['status'] = 'saved'
+        ..['selectedTaskIds'] = review.entries.map((entry) => entry.id).toList()
+        ..['selectedTitles'] = review.entries
+            .map((entry) => entry.title)
+            .toList()
+        ..['usedMinutes'] = review.usedMinutes
+        ..['taskSnapshots'] = {
+          for (final entry in review.entries)
+            entry.id: _taskSnapshot(entry.task!),
+        };
+      final remaining = remainingTasksForPlan(normalized);
+      normalized['droppedTaskIds'] = remaining.map((task) => task.id).toList();
+      normalized['droppedTitles'] = remaining
+          .map((task) => task.title)
+          .toList();
+      final previous = acceptedPlanForDay(day);
+      String content(Map<String, dynamic> value) => jsonEncode([
+        value['availableMinutes'],
+        _planIds(value),
+        value['taskSnapshots'],
+        value['notes'],
+      ]);
+      if (previous == null || content(previous) != content(normalized)) {
+        normalized['savedAt'] = DateTime.now().toIso8601String();
+        await _dayPlansBox.put(key, normalized);
+        logAnalyticsEvent('plan_saved', {
+          'date': normalized['date'],
+          'availableMinutes': minutes,
+          'selectedCount': review.entries.length,
+        });
+      }
+      _planDrafts.remove(key);
+    } finally {
+      _savingPlanDays.remove(key);
+      notifyListeners();
+    }
   }
 
   Future<void> savePlanForDay(
@@ -187,33 +500,22 @@ class AppState extends ChangeNotifier {
     List<Task> droppedTasks = const [],
     String? notes,
   }) async {
-    final plan = generatePlanForDay(day, availableMinutes,
-        tasks: [...plannedTasks, ...droppedTasks], notes: notes);
-    final finalSelected = plannedTasks.map((task) => task.id).toList();
-    final finalDropped = droppedTasks.map((task) => task.id).toList();
-
-    final saved = Map<String, dynamic>.from(plan)
-      ..['selectedTaskIds'] = finalSelected
-      ..['selectedTitles'] = plannedTasks.map((task) => task.title).toList()
-      ..['droppedTaskIds'] = finalDropped
-      ..['droppedTitles'] = droppedTasks.map((task) => task.title).toList();
-
-    await savePlan(saved);
+    await savePlan({
+      'date': DateUtils.dateOnly(day).toIso8601String(),
+      'availableMinutes': availableMinutes,
+      'selectedTaskIds': plannedTasks.map((task) => task.id).toList(),
+      'notes': notes,
+    });
   }
 
   List<Task> tasksForPlan(Map<String, dynamic> plan) {
-    final ids = (plan['selectedTaskIds'] as List? ?? [])
-        .whereType<String>()
-        .toSet();
-    final tasks = <Task>[];
-    for (final list in lists) {
-      for (final task in list.tasks) {
-        if (ids.contains(task.id)) {
-          tasks.add(task);
-        }
-      }
-    }
-    return tasks;
+    final allTasks = {
+      for (final task in lists.expand((list) => list.tasks)) task.id: task,
+    };
+    return [
+      for (final id in _planIds(plan))
+        if (allTasks[id] != null) allTasks[id]!,
+    ];
   }
 
   bool get isLoggedIn => currentUser != null;
@@ -804,7 +1106,7 @@ class AppState extends ChangeNotifier {
       final task = available[i - 1];
       final d = task.durationMinutes!;
       final p = task.priority ?? 0;
-      final u = calculateUrgency(task.date);
+      final u = calculateUrgency(task.deadline);
       final effectiveValue = p + u;
 
       for (var w = 0; w <= capacityMinutes; w++) {

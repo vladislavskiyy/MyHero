@@ -27,6 +27,7 @@ class Task extends HiveObject {
   int? priority;
 
   @HiveField(5)
+  // Planned day (or the first occurrence), independent of the deadline.
   DateTime? date;
 
   @HiveField(6)
@@ -96,18 +97,20 @@ class Task extends HiveObject {
   bool appearsOn(DateTime day) {
     final taskDate = date;
     if (taskDate == null) return false;
+    final startDay = DateTime.utc(taskDate.year, taskDate.month, taskDate.day);
+    final targetDay = DateTime.utc(day.year, day.month, day.day);
 
     switch (recurrenceType) {
       case TaskRecurrenceType.none:
         return DateUtils.isSameDay(taskDate, day);
       case TaskRecurrenceType.daily:
-        return !day.isBefore(taskDate) && day.difference(taskDate).inDays >= 0;
+        return !targetDay.isBefore(startDay);
       case TaskRecurrenceType.weekly:
-        if (day.isBefore(taskDate)) return false;
-        final diff = day.difference(taskDate).inDays;
+        if (targetDay.isBefore(startDay)) return false;
+        final diff = targetDay.difference(startDay).inDays;
         return diff % 7 == 0;
       case TaskRecurrenceType.monthly:
-        if (day.isBefore(taskDate)) return false;
+        if (targetDay.isBefore(startDay)) return false;
         final diffMonths =
             (day.year - taskDate.year) * 12 + (day.month - taskDate.month);
         return diffMonths >= 0 && day.day == taskDate.day;

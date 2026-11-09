@@ -15,6 +15,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
 
   final titleController = TextEditingController(text: task?.title ?? '');
   DateTime? selectedDate = task?.date;
+  final selectedDeadline = task?.deadline;
 
   String category = task?.category ?? '';
   Color selectedColor = task?.color ?? AppColors.accent;
@@ -38,6 +39,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
             isEdit: isEdit,
             titleController: titleController,
             initialDate: selectedDate,
+            initialDeadline: selectedDeadline,
             initialCategory: category,
             initialColor: selectedColor,
             initialDuration: durationMinutes,
@@ -49,6 +51,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
                 ({
                   required String title,
                   required DateTime? date,
+                  required DateTime? deadline,
                   required String category,
                   required Color color,
                   required int? duration,
@@ -68,6 +71,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
                     task
                       ..title = title
                       ..date = date
+                      ..deadline = deadline
                       ..category = catToSave
                       ..color = colorToSave
                       ..durationMinutes = duration
@@ -89,6 +93,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
                         id: DateTime.now().toIso8601String(),
                         title: title,
                         date: date,
+                        deadline: deadline,
                         category: catToSave,
                         color: colorToSave,
                         durationMinutes: duration,
@@ -129,6 +134,7 @@ class _TaskSheet extends StatefulWidget {
   final TextEditingController titleController;
 
   final DateTime? initialDate;
+  final DateTime? initialDeadline;
   final String initialCategory;
   final Color initialColor;
   final int? initialDuration;
@@ -140,6 +146,7 @@ class _TaskSheet extends StatefulWidget {
   final Future<void> Function({
     required String title,
     required DateTime? date,
+    required DateTime? deadline,
     required String category,
     required Color color,
     required int? duration,
@@ -154,6 +161,7 @@ class _TaskSheet extends StatefulWidget {
     required this.isEdit,
     required this.titleController,
     required this.initialDate,
+    required this.initialDeadline,
     required this.initialCategory,
     required this.initialColor,
     required this.initialDuration,
@@ -170,6 +178,7 @@ class _TaskSheet extends StatefulWidget {
 
 class _TaskSheetState extends State<_TaskSheet> {
   late DateTime? _date = widget.initialDate;
+  late DateTime? _deadline = widget.initialDeadline;
   late String _category = widget.initialCategory;
   late Color _color = widget.initialColor;
   late int? _duration = widget.initialDuration;
@@ -216,9 +225,8 @@ class _TaskSheetState extends State<_TaskSheet> {
     }
   }
 
-  String get _dateText {
-    final d = _date;
-    if (d == null) return 'Без даты';
+  String _formatDate(DateTime? d, String emptyText) {
+    if (d == null) return emptyText;
     return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
   }
 
@@ -377,8 +385,8 @@ class _TaskSheetState extends State<_TaskSheet> {
                 Expanded(
                   child: _ActionTile(
                     icon: Icons.calendar_today_rounded,
-                    title: 'Дата',
-                    value: _dateText,
+                    title: 'Запланировано на',
+                    value: _formatDate(_date, 'Без даты'),
                     onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
@@ -412,6 +420,46 @@ class _TaskSheetState extends State<_TaskSheet> {
               ],
             ),
 
+            const SizedBox(height: 12),
+            _ActionTile(
+              icon: Icons.event_busy_rounded,
+              title: 'Дедлайн',
+              value: _formatDate(_deadline, 'Не задан'),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _deadline ?? _date ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2035),
+                );
+                if (picked != null) setState(() => _deadline = picked);
+              },
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Дата планирования — когда заняться задачей. '
+              'Дедлайн — крайний срок; он определяет срочность в автоплане.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            if (_date != null || _deadline != null)
+              Wrap(
+                spacing: 12,
+                children: [
+                  if (_date != null)
+                    TextButton.icon(
+                      onPressed: () => setState(() => _date = null),
+                      icon: const Icon(Icons.clear_rounded),
+                      label: const Text('Убрать дату планирования'),
+                    ),
+                  if (_deadline != null)
+                    TextButton.icon(
+                      onPressed: () => setState(() => _deadline = null),
+                      icon: const Icon(Icons.clear_rounded),
+                      label: const Text('Убрать дедлайн'),
+                    ),
+                ],
+              ),
+
             if (_category.trim().isNotEmpty) ...[
               const SizedBox(height: 10),
               OutlinedButton.icon(
@@ -431,59 +479,62 @@ class _TaskSheetState extends State<_TaskSheet> {
               data: Theme.of(
                 context,
               ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                initiallyExpanded: _advanced,
-                onExpansionChanged: (v) => setState(() => _advanced = v),
-                tilePadding: EdgeInsets.zero,
-                title: const Text(
-                  'Дополнительно',
-                  style: TextStyle(fontWeight: FontWeight.w900),
-                ),
-                children: [
-                  const SizedBox(height: 4),
-                  _LabeledDropdown<int>(
-                    label: 'Длительность',
-                    value: _duration,
-                    hint: 'Не указано',
-                    items: const [15, 30, 45, 60, 90, 120, 180],
-                    itemLabel: (m) => '$m минут',
-                    icon: Icons.timer_rounded,
-                    onChanged: (v) => setState(() => _duration = v),
+              child: Material(
+                type: MaterialType.transparency,
+                child: ExpansionTile(
+                  initiallyExpanded: _advanced,
+                  onExpansionChanged: (v) => setState(() => _advanced = v),
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Дополнительно',
+                    style: TextStyle(fontWeight: FontWeight.w900),
                   ),
-                  const SizedBox(height: 12),
-                  _LabeledDropdown<int>(
-                    label: 'Приоритет',
-                    value: _priority,
-                    hint: 'Не указано',
-                    items: const [1, 2, 3, 4, 5],
-                    itemLabel: (p) => 'Приоритет $p',
-                    icon: Icons.flag_rounded,
-                    onChanged: (v) => setState(() => _priority = v),
-                  ),
-                  const SizedBox(height: 6),
-                  _LabeledDropdown<TaskRecurrenceType>(
-                    label: 'Повторение',
-                    value: _recurrenceType,
-                    hint: 'Без повтора',
-                    items: TaskRecurrenceType.values,
-                    itemLabel: (value) {
-                      switch (value) {
-                        case TaskRecurrenceType.none:
-                          return 'Без повтора';
-                        case TaskRecurrenceType.daily:
-                          return 'Каждый день';
-                        case TaskRecurrenceType.weekly:
-                          return 'Каждую неделю';
-                        case TaskRecurrenceType.monthly:
-                          return 'Каждый месяц';
-                      }
-                    },
-                    icon: Icons.repeat_rounded,
-                    onChanged: (v) => setState(
-                      () => _recurrenceType = v ?? TaskRecurrenceType.none,
+                  children: [
+                    const SizedBox(height: 4),
+                    _LabeledDropdown<int>(
+                      label: 'Длительность',
+                      value: _duration,
+                      hint: 'Не указано',
+                      items: const [15, 30, 45, 60, 90, 120, 180],
+                      itemLabel: (m) => '$m минут',
+                      icon: Icons.timer_rounded,
+                      onChanged: (v) => setState(() => _duration = v),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    _LabeledDropdown<int>(
+                      label: 'Приоритет',
+                      value: _priority,
+                      hint: 'Не указано',
+                      items: const [1, 2, 3, 4, 5],
+                      itemLabel: (p) => 'Приоритет $p',
+                      icon: Icons.flag_rounded,
+                      onChanged: (v) => setState(() => _priority = v),
+                    ),
+                    const SizedBox(height: 6),
+                    _LabeledDropdown<TaskRecurrenceType>(
+                      label: 'Повторение',
+                      value: _recurrenceType,
+                      hint: 'Без повтора',
+                      items: TaskRecurrenceType.values,
+                      itemLabel: (value) {
+                        switch (value) {
+                          case TaskRecurrenceType.none:
+                            return 'Без повтора';
+                          case TaskRecurrenceType.daily:
+                            return 'Каждый день';
+                          case TaskRecurrenceType.weekly:
+                            return 'Каждую неделю';
+                          case TaskRecurrenceType.monthly:
+                            return 'Каждый месяц';
+                        }
+                      },
+                      icon: Icons.repeat_rounded,
+                      onChanged: (v) => setState(
+                        () => _recurrenceType = v ?? TaskRecurrenceType.none,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -521,6 +572,7 @@ class _TaskSheetState extends State<_TaskSheet> {
                         await widget.onSave(
                           title: title,
                           date: _date,
+                          deadline: _deadline,
                           category: _category,
                           color: _color,
                           duration: _duration,

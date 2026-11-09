@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/task_tile.dart';
+import '../widgets/day_plan_editor.dart';
 
 class TodayPage extends StatefulWidget {
   const TodayPage({super.key});
@@ -17,38 +18,22 @@ class TodayPage extends StatefulWidget {
   State<TodayPage> createState() => _TodayPageState();
 }
 
-class _TodayPageState extends State<TodayPage> {
-  final TextEditingController _planMinutesController = TextEditingController(
-    text: '120',
-  );
-  Map<String, dynamic>? _planProposal;
+class _TodayPageState extends State<TodayPage> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void dispose() {
-    _planMinutesController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _generatePlan(BuildContext context) {
-    final appState = context.read<AppState>();
-    final minutes = int.tryParse(_planMinutesController.text) ?? 120;
-    final tasks = appState.lists.expand((list) => list.tasks).toList();
-    final proposal = appState.generatePlanForDay(
-      DateTime.now(),
-      minutes,
-      tasks: tasks,
-    );
-    setState(() => _planProposal = proposal);
-  }
-
-  Future<void> _savePlan(BuildContext context) async {
-    final appState = context.read<AppState>();
-    if (_planProposal == null) return;
-    await appState.savePlan(Map<String, dynamic>.from(_planProposal!));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(const SnackBar(content: Text('План сохранён на сегодня')));
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) setState(() {});
   }
 
   @override
@@ -56,29 +41,25 @@ class _TodayPageState extends State<TodayPage> {
     final st = context.watch<AppState>();
     final today = DateTime.now();
 
-    final tasksForToday =
-        st.lists
-            .expand((list) => list.tasks)
-            .where((task) => task.date != null && task.appearsOn(today))
-            .toList()
-          ..sort((a, b) {
-            if (a.isDone != b.isDone) return a.isDone ? 1 : -1;
-            final aPriority = a.priority ?? 0;
-            final bPriority = b.priority ?? 0;
-            if (aPriority != bPriority) return bPriority.compareTo(aPriority);
-            return (a.title).toLowerCase().compareTo(b.title.toLowerCase());
-          });
-
-    final pending = tasksForToday.where((task) => !task.isDone).toList();
-    final completed = tasksForToday.where((task) => task.isDone).toList();
+    final acceptedPlan = st.acceptedPlanForDay(today);
+    final acceptedReview = acceptedPlan == null
+        ? null
+        : st.reviewPlan(acceptedPlan);
+    final workingTasks = acceptedPlan == null
+        ? <Task>[]
+        : st.tasksForPlan(acceptedPlan);
+    final pending = workingTasks.where((task) => !task.isDone).toList();
+    final completed = workingTasks.where((task) => task.isDone).toList();
+    final selectedIds =
+        acceptedReview?.entries.map((entry) => entry.id).toSet() ?? <String>{};
+    final otherTasks = st.lists
+        .expand((list) => list.tasks)
+        .where((task) => !task.isDone && !selectedIds.contains(task.id))
+        .toList();
     final habitsForToday = st.habits
         .where((habit) => !habit.isDoneOn(today))
         .take(3)
         .toList();
-    final selectedTasks = _planProposal == null
-        ? <Task>[]
-        : st.tasksForPlan(_planProposal!);
-
     return Scaffold(
       appBar: const CustomAppBar(
         title: Text('Сегодня', style: TextStyle(color: Colors.white)),
@@ -105,168 +86,7 @@ class _TodayPageState extends State<TodayPage> {
               ),
               const SizedBox(height: 14),
 
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.accent.withAlpha((0.12 * 255).round()),
-                      AppColors.surface,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadii.xl),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: AppShadows.card,
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withAlpha(
-                              (0.14 * 255).round(),
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.auto_awesome_rounded,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'План на сегодня',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.textPrimary,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _planMinutesController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        hintText: 'Доступно минут',
-                        hintStyle: TextStyle(
-                          color: AppColors.textMuted.withValues(alpha: 0.55),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        filled: true,
-                        fillColor: AppColors.pageBg,
-                        prefixIcon: const Icon(
-                          Icons.timer_rounded,
-                          color: AppColors.textMuted,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: AppColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(color: AppColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide(
-                            color: AppColors.accent,
-                            width: 1.5,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _generatePlan(context),
-                            icon: const Icon(Icons.bolt_rounded),
-                            label: const Text('Сгенерировать'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _planProposal == null
-                                ? null
-                                : () => _savePlan(context),
-                            icon: const Icon(Icons.save_rounded),
-                            label: const Text('Сохранить'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_planProposal != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppColors.pageBg,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Рекомендовано: ${_planProposal!['selectedTaskIds'].length} задач · ${_planProposal!['usedMinutes']} мин',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            if (selectedTasks.isEmpty)
-                              const Text(
-                                'В план не вошло ничего — попробуйте увеличить время.',
-                              )
-                            else
-                              ...selectedTasks.map(
-                                (task) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle_rounded,
-                                        size: 18,
-                                        color: AppColors.accent,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          task.title,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              DayPlanEditor(day: today, showAcceptedTasks: false),
               const SizedBox(height: 14),
 
               if (habitsForToday.isNotEmpty) ...[
@@ -316,6 +136,7 @@ class _TodayPageState extends State<TodayPage> {
                         onChanged: (_) async {
                           final wasDone = habit.isDoneOn(today);
                           await st.toggleHabitDay(habit, today);
+                          if (!context.mounted) return;
                           if (!wasDone &&
                               st.habits.any(
                                 (h) => h.id == habit.id && h.isDoneOn(today),
@@ -338,64 +159,54 @@ class _TodayPageState extends State<TodayPage> {
               ],
 
               _SectionHeader(
-                title: 'Задачи на сегодня',
+                title: 'Рабочий список дня',
                 subtitle:
                     '${pending.length} активных · ${completed.length} готово',
               ),
               const SizedBox(height: 8),
-
-              if (pending.isEmpty && completed.isEmpty)
-                _EmptyTodayState(onAdd: () => showTaskDialog(context))
-              else ...[
-                if (pending.isNotEmpty)
-                  ...pending.map(
-                    (task) => TaskTile(
-                      task,
-                      (tk, value) async {
-                        final wasDone = tk.isDone;
-                        await st.toggleDone(tk, value);
-                        if (!wasDone && (value ?? false)) {
-                          ScaffoldMessenger.of(context)
-                            ..clearSnackBars()
-                            ..showSnackBar(
-                              const SnackBar(content: Text('+5 XP за задачу!')),
-                            );
-                        }
-                      },
-                      (tk) => showTaskDialog(context, task: tk),
-                      (tk) => st.deleteTask(tk),
+              if (acceptedReview == null)
+                const Text(
+                  'Принятого плана на сегодня пока нет. Задачи появятся здесь после подтверждения плана.',
+                )
+              else if (acceptedReview.entries.isEmpty)
+                const Text(
+                  'Принят пустой план. Можно отредактировать его и добавить задачи.',
+                )
+              else
+                for (final entry in acceptedReview.entries)
+                  if (entry.task == null)
+                    Container(
+                      key: ValueKey('working-task-${entry.id}'),
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.all(14),
+                      decoration: AppDecorations.card(),
+                      child: Text(
+                        'Задача «${entry.title}» удалена. Исправьте принятый план.',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    )
+                  else
+                    _taskTile(
+                      st,
+                      entry.task!,
+                      key: ValueKey('working-task-${entry.id}'),
                     ),
+              const SizedBox(height: 16),
+              Material(
+                color: Colors.transparent,
+                child: ExpansionTile(
+                  key: const ValueKey('other-tasks'),
+                  title: Text('Остальные задачи (${otherTasks.length})'),
+                  subtitle: const Text(
+                    'Задачи вне принятого плана, включая другие дни',
                   ),
-                if (completed.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Готово',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...completed.map(
-                    (task) => TaskTile(
-                      task,
-                      (tk, value) async {
-                        final wasDone = tk.isDone;
-                        await st.toggleDone(tk, value);
-                        if (!wasDone && (value ?? false)) {
-                          ScaffoldMessenger.of(context)
-                            ..clearSnackBars()
-                            ..showSnackBar(
-                              const SnackBar(content: Text('+5 XP за задачу!')),
-                            );
-                        }
-                      },
-                      (tk) => showTaskDialog(context, task: tk),
-                      (tk) => st.deleteTask(tk),
-                    ),
-                  ),
-                ],
-              ],
+                  children: [
+                    for (final task in otherTasks) _taskTile(st, task),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -403,6 +214,24 @@ class _TodayPageState extends State<TodayPage> {
     );
   }
 
+  Widget _taskTile(AppState state, Task task, {Key? key}) => IntrinsicHeight(
+    key: key,
+    child: TaskTile(
+      task,
+      (task, value) async {
+        final wasDone = task.isDone;
+        await state.toggleDone(task, value);
+        if (!mounted) return;
+        if (!wasDone && (value ?? false)) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('+5 XP за задачу!')));
+        }
+      },
+      (task) => showTaskDialog(context, task: task),
+      (task) => state.deleteTask(task),
+    ),
+  );
   String _formatDate(DateTime date) {
     const months = [
       'янв',
@@ -660,57 +489,6 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _EmptyTodayState extends StatelessWidget {
-  final VoidCallback onAdd;
-
-  const _EmptyTodayState({required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card(),
-      child: Column(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.pageBg,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: const Icon(
-              Icons.checklist_rounded,
-              size: 30,
-              color: AppColors.accent,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'На сегодня задач нет',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Добавьте важную задачу или перенесите её из Inbox — и день будет собран по плану.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Добавить задачу'),
-          ),
-        ],
-      ),
     );
   }
 }
