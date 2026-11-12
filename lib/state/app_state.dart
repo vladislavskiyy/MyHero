@@ -133,6 +133,7 @@ class AppState extends ChangeNotifier {
   }
 
   Map<String, dynamic> _taskSnapshot(Task task) => {
+    'id': task.id,
     'title': task.title,
     'durationMinutes': task.effectiveDurationMinutes,
     'date': task.date == null
@@ -143,7 +144,19 @@ class AppState extends ChangeNotifier {
         : DateUtils.dateOnly(task.deadline!).toIso8601String(),
     'recurrenceType': task.recurrenceType.index,
     'priority': task.priority,
+    'parentTaskId': task.parentTaskId,
+    'sourceStepId': task.sourceStepId,
   };
+
+  bool _snapshotHasChanged(Map snapshot, Task task) {
+    final current = _taskSnapshot(task);
+    // Older snapshots lack the new identity fields; do not count that as an edit.
+    return snapshot.entries.any(
+      (entry) =>
+          current.containsKey(entry.key) &&
+          jsonEncode(entry.value) != jsonEncode(current[entry.key]),
+    );
+  }
 
   DayPlanReview reviewPlan(Map<String, dynamic> plan) {
     final day = _planDate(plan);
@@ -175,7 +188,7 @@ class AppState extends ChangeNotifier {
               task != null &&
               (snapshot == null
                   ? oldTitle != task.title
-                  : jsonEncode(snapshot) != jsonEncode(_taskSnapshot(task))),
+                  : _snapshotHasChanged(snapshot, task)),
           isAvailable:
               task != null && (task.isDone || _isPlanCandidate(task, day)),
         ),
@@ -215,7 +228,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _editPlanDraft(DateTime day, void Function(Map<String, dynamic>) edit) {
+  void _editPlanDraft(
+    DateTime day,
+    String change,
+    void Function(Map<String, dynamic>) edit, {
+    Map<String, dynamic> details = const {},
+  }) {
     if (isSavingPlan(day)) return;
     final existing = _planDrafts[_planKey(day)] ?? acceptedPlanForDay(day);
     if (existing == null) return;
@@ -244,6 +262,25 @@ class AppState extends ChangeNotifier {
     draft['droppedTaskIds'] = remaining.map((task) => task.id).toList();
     draft['droppedTitles'] = remaining.map((task) => task.title).toList();
     _planDrafts[_planKey(day)] = draft;
+    String editableContent(Map<String, dynamic> value) => jsonEncode([
+      value['availableMinutes'],
+      _planIds(value),
+      value['notes'],
+    ]);
+    if (editableContent(existing) != editableContent(draft)) {
+      logAnalyticsEvent('plan_changed', {
+        'planId': _planKey(day),
+        'draftId': draft['draftId'],
+        'date': draft['date'],
+        'change': change,
+        ...details,
+        'beforeSelectedTaskIds': _planIds(existing),
+        'selectedTaskIds': _planIds(draft),
+        'beforeAvailableMinutes': existing['availableMinutes'],
+        'availableMinutes': draft['availableMinutes'],
+        'planSnapshot': draft,
+      });
+    }
     notifyListeners();
   }
 
@@ -254,15 +291,21 @@ class AppState extends ChangeNotifier {
       maxPlanMinutes,
       'availableMinutes',
     );
-    _editPlanDraft(day, (draft) => draft['availableMinutes'] = minutes);
+    _editPlanDraft(
+      day,
+      'budget_changed',
+      (draft) => draft['availableMinutes'] = minutes,
+    );
   }
 
   void removeTaskFromPlan(DateTime day, String taskId) {
     _editPlanDraft(
       day,
+      'task_removed',
       (draft) => draft['selectedTaskIds'] = _planIds(
         draft,
       ).where((id) => id != taskId).toList(),
+      details: {'taskId': taskId},
     );
   }
 
@@ -273,25 +316,25 @@ class AppState extends ChangeNotifier {
     if (task == null) {
       throw StateError('Эта задача больше не подходит выбранному дню.');
     }
-    _editPlanDraft(day, (draft) {
+    _editPlanDraft(day, 'task_added', (draft) {
       draft['selectedTaskIds'] = {..._planIds(draft), taskId}.toList();
       final snapshots = Map<String, dynamic>.from(
         draft['taskSnapshots'] as Map? ?? {},
       );
       snapshots.putIfAbsent(taskId, () => _taskSnapshot(task));
       draft['taskSnapshots'] = snapshots;
-    });
+    }, details: {'taskId': taskId});
   }
 
   void movePlanTask(DateTime day, int from, int to) {
-    _editPlanDraft(day, (draft) {
+    _editPlanDraft(day, 'task_reordered', (draft) {
       final ids = _planIds(draft);
       RangeError.checkValidIndex(from, ids, 'from');
       RangeError.checkValidIndex(to, ids, 'to');
       final id = ids.removeAt(from);
       ids.insert(to, id);
       draft['selectedTaskIds'] = ids;
-    });
+    }, details: {'from': from, 'to': to});
   }
 
   Future<void> acceptPlanDraft(DateTime day) async {
@@ -301,40 +344,58 @@ class AppState extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> get analyticsEvents {
-    final events = _analyticsBox.values
-        .whereType<Map>()
-        .map((entry) => Map<String, dynamic>.from(entry))
-        .toList();
-    events.sort((a, b) {
-      final aTime =
-          DateTime.tryParse(
-            (a['timestamp'] as String? ?? '1970-01-01T00:00:00.000'),
-          ) ??
-          DateTime(1970);
-      final bTime =
-          DateTime.tryParse(
-            (b['timestamp'] as String? ?? '1970-01-01T00:00:00.000'),
-          ) ??
-          DateTime(1970);
-      return bTime.compareTo(aTime);
-    });
+    final events = <Map<String, dynamic>>[];
+    var storedOrder = 0;
+    for (final value in _analyticsBox.values) {
+      final event = _copyPlan(value);
+      // Legacy events retain their timestamps and get their stored append order.
+      event.putIfAbsent('sequence', () => storedOrder + 1);
+      events.add(event);
+      storedOrder++;
+    }
+    events.sort(
+      (a, b) => (b['sequence'] as int).compareTo(a['sequence'] as int),
+    );
     return events;
   }
 
-  void logAnalyticsEvent(String type, Map<String, dynamic> payload) {
+  late int _eventSequence = _analyticsBox.values.fold<int>(
+    _analyticsBox.length,
+    (highest, event) => max(highest, event['sequence'] as int? ?? 0),
+  );
+
+  Future<void> logAnalyticsEvent(
+    String type,
+    Map<String, dynamic> payload, {
+    DateTime? timestamp,
+  }) {
+    final time = (timestamp ?? DateTime.now()).toUtc();
+    final sequence = ++_eventSequence;
     final event = <String, dynamic>{
-      'id': '${DateTime.now().millisecondsSinceEpoch}',
+      ..._copyPlan(payload),
+      'id': 'event_${time.microsecondsSinceEpoch}_$sequence',
       'type': type,
-      'timestamp': DateTime.now().toIso8601String(),
-      ...payload,
+      'timestamp': time.toIso8601String(),
+      'sequence': sequence,
     };
-    _analyticsBox.add(event);
-    notifyListeners();
+    return _analyticsBox.add(event).then((_) {});
   }
 
   String exportAnalyticsJson() {
-    final data = analyticsEvents;
-    return jsonEncode(data);
+    return jsonEncode({
+      'schemaVersion': 2,
+      'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      'taskLists': [
+        for (final list in lists)
+          {'id': list.id, 'name': list.name, 'color': list.colorValue},
+      ],
+      'tasks': [
+        for (final list in lists)
+          for (final task in list.tasks) {...task.toMap(), 'listId': list.id},
+      ],
+      'plans': savedPlans,
+      'events': analyticsEvents.reversed.toList(),
+    });
   }
 
   Map<String, dynamic> generatePlanForDay(
@@ -405,13 +466,15 @@ class AppState extends ChangeNotifier {
         .where((task) => !selectedIds.contains(task.id))
         .toList();
 
+    final generatedAt = DateTime.now().toUtc();
+    final draftId = 'draft_${Task.newBreakdownStepId()}';
     final plan = <String, dynamic>{
-      'id':
-          'plan_${day.year}${day.month.toString().padLeft(2, '0')}${day.day.toString().padLeft(2, '0')}_${DateTime.now().millisecondsSinceEpoch}',
-      'date': day.toIso8601String(),
+      'id': draftId,
+      'draftId': draftId,
+      'date': DateUtils.dateOnly(day).toIso8601String(),
       'availableMinutes': availableMinutes,
       'usedMinutes': used,
-      'generatedAt': DateTime.now().toIso8601String(),
+      'generatedAt': generatedAt.toIso8601String(),
       'selectedTaskIds': selectedIds,
       'taskSnapshots': {
         for (final task in selected) task.id: _taskSnapshot(task),
@@ -425,12 +488,16 @@ class AppState extends ChangeNotifier {
     };
 
     logAnalyticsEvent('plan_generated', {
-      'date': day.toIso8601String(),
+      'planId': _planKey(day),
+      'draftId': draftId,
+      'date': plan['date'],
       'availableMinutes': availableMinutes,
       'selectedCount': selected.length,
       'droppedCount': dropped.length,
       'usedMinutes': used,
-    });
+      'selectedTaskIds': selectedIds,
+      'planSnapshot': plan,
+    }, timestamp: generatedAt);
 
     return plan;
   }
@@ -478,13 +545,25 @@ class AppState extends ChangeNotifier {
         value['notes'],
       ]);
       if (previous == null || content(previous) != content(normalized)) {
-        normalized['savedAt'] = DateTime.now().toIso8601String();
+        final acceptedAt = DateTime.now().toUtc();
+        normalized['savedAt'] = acceptedAt.toIso8601String();
+        normalized['acceptanceId'] = 'acceptance_${Task.newBreakdownStepId()}';
         await _dayPlansBox.put(key, normalized);
-        logAnalyticsEvent('plan_saved', {
+        await logAnalyticsEvent('plan_saved', {
+          'planId': key,
+          'draftId': normalized['draftId'],
+          'acceptanceId': normalized['acceptanceId'],
+          'previousAcceptanceId': previous?['acceptanceId'],
           'date': normalized['date'],
           'availableMinutes': minutes,
           'selectedCount': review.entries.length,
-        });
+          'selectedTaskIds': _planIds(normalized),
+          'planSnapshot': normalized,
+          // Legacy acceptances have no archived event snapshot. Preserve only
+          // their known facts before replacing the current plan for that day.
+          if (previous != null && previous['acceptanceId'] == null)
+            'previousPlanSnapshot': previous,
+        }, timestamp: acceptedAt);
       }
       _planDrafts.remove(key);
     } finally {
@@ -763,6 +842,83 @@ class AppState extends ChangeNotifier {
 
   Future<void> addTaskToInbox(Task t) => addTask(t, listId: inboxId);
 
+  Task? taskById(String id) {
+    for (final task in lists.expand((list) => list.tasks)) {
+      if (task.id == id) return task;
+    }
+    return null;
+  }
+
+  Task? actionForStep(String parentTaskId, String stepId) {
+    for (final task in lists.expand((list) => list.tasks)) {
+      if (task.parentTaskId == parentTaskId && task.sourceStepId == stepId) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  final Map<String, Future<Task>> _creatingStepActions = {};
+
+  Future<Task> createActionFromStep(
+    Task parent, {
+    required String stepId,
+    required int estimatedDurationMinutes,
+  }) {
+    final key = jsonEncode([parent.id, stepId]);
+    final pending = _creatingStepActions[key];
+    if (pending != null) return pending;
+    final future = _createActionFromStep(
+      parent.id,
+      stepId,
+      estimatedDurationMinutes,
+    );
+    _creatingStepActions[key] = future;
+    return future.whenComplete(() => _creatingStepActions.remove(key));
+  }
+
+  Future<Task> _createActionFromStep(
+    String parentId,
+    String stepId,
+    int minutes,
+  ) async {
+    final parent = taskById(parentId);
+    if (parent == null) throw StateError('Исходное дело удалено.');
+    final index = parent.breakdownStepIds.indexOf(stepId);
+    if (index < 0 || index >= parent.breakdownSteps.length) {
+      throw StateError('Этот шаг больше не существует.');
+    }
+    final existing = actionForStep(parentId, stepId);
+    if (existing != null) return existing;
+    final title = parent.breakdownSteps[index].trim();
+    if (title.isEmpty) throw StateError('Введите название шага.');
+    if (minutes < 1 || minutes > maxPlanMinutes) {
+      throw ArgumentError('Укажите длительность действия от 1 до 1440 минут.');
+    }
+    final list = _listContainingTask(parent);
+    final action = Task(
+      id: 'step-action:${Task.newBreakdownStepId()}',
+      title: title,
+      parentTaskId: parentId,
+      sourceStepId: stepId,
+      estimatedDurationMinutes: minutes,
+      category: parent.category,
+      priority: parent.priority,
+      taskPriority: parent.taskPriority,
+      listId: list.id,
+    )..color = parent.color;
+    list.tasks.insert(0, action);
+    try {
+      // One list write persists both the step IDs and their linked action.
+      await _listsBox.put(list.id, list);
+    } catch (_) {
+      list.tasks.remove(action);
+      rethrow;
+    }
+    notifyListeners();
+    return action;
+  }
+
   Future<void> updateTask(
     Task t, {
     required String title,
@@ -787,22 +943,70 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleDone(Task t, bool? done) async {
-    final wasDone = t.isDone;
-    final isDone = done ?? false;
+  Future<void> _completionWrite = Future.value();
 
-    if (!wasDone && isDone) {
-      xpEarned += 5;
-    } else if (wasDone && !isDone) {
-      xpEarned = max(xpEarned - 5, 0);
+  Future<void> toggleDone(Task t, bool? done) {
+    // Serialize quick repeated clicks and undo/redo, including their events.
+    final operation = _completionWrite.then(
+      (_) => _setTaskDone(t.id, done ?? false),
+    );
+    _completionWrite = operation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return operation;
+  }
+
+  Future<void> _setTaskDone(String taskId, bool isDone) async {
+    final task = taskById(taskId);
+    if (task == null) throw StateError('Задача удалена.');
+    if (task.isDone == isDone) return;
+
+    final wasDone = task.isDone;
+    final previousCompletedAt = task.completedAt;
+    // Hive stores DateTime at millisecond precision. Use the same instant in
+    // the task and its event so they still agree after reopening storage.
+    final changedAt = DateTime.fromMillisecondsSinceEpoch(
+      DateTime.now().millisecondsSinceEpoch,
+      isUtc: true,
+    );
+    task.isDone = isDone;
+    task.completedAt = isDone ? changedAt : null;
+    final list = _listContainingTask(task);
+    final planReferences = [
+      for (final plan in savedPlans)
+        if (_planIds(plan).contains(taskId))
+          {
+            'planId': plan['id'],
+            'acceptanceId': plan['acceptanceId'],
+            'date': plan['date'],
+          },
+    ];
+    try {
+      await _listsBox.put(list.id, list);
+    } catch (_) {
+      task.isDone = wasDone;
+      task.completedAt = previousCompletedAt;
+      rethrow;
     }
-
+    xpEarned = isDone ? xpEarned + 5 : max(xpEarned - 5, 0);
     _saveSettings();
-    t.isDone = isDone;
     _checkAchievements();
-
-    final list = _listContainingTask(t);
-    await _listsBox.put(list.id, list);
+    await logAnalyticsEvent(
+      isDone ? 'task_completed' : 'task_completion_undone',
+      {
+        'taskId': task.id,
+        'listId': list.id,
+        'parentTaskId': task.parentTaskId,
+        'sourceStepId': task.sourceStepId,
+        'isDone': isDone,
+        'completedAt': task.completedAt?.toIso8601String(),
+        'previousCompletedAt': previousCompletedAt?.toUtc().toIso8601String(),
+        'taskSnapshot': _taskSnapshot(task),
+        'plans': planReferences,
+      },
+      timestamp: changedAt,
+    );
     notifyListeners();
   }
 

@@ -1,5 +1,7 @@
 // lib/models/task.dart
 
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 
@@ -39,10 +41,10 @@ class Task extends HiveObject {
   @HiveField(8)
   String? listId;
 
-  @HiveField(9)
+  @HiveField(9, defaultValue: 0)
   int recurrenceTypeValue;
 
-  @HiveField(10)
+  @HiveField(10, defaultValue: 1)
   int priorityLevelValue;
 
   @HiveField(11)
@@ -51,8 +53,23 @@ class Task extends HiveObject {
   @HiveField(12)
   int? estimatedDurationMinutes;
 
-  @HiveField(13)
+  @HiveField(13, defaultValue: <String>[])
   List<String> breakdownSteps;
+
+  // Keep field 13 as text for compatibility. IDs travel with their steps when
+  // editing, so renaming or moving a step never changes its action's identity.
+  @HiveField(14)
+  List<String> breakdownStepIds;
+
+  @HiveField(15)
+  String? parentTaskId;
+
+  @HiveField(16)
+  String? sourceStepId;
+
+  // Null also means the completion date of a legacy done task is unknown.
+  @HiveField(17)
+  DateTime? completedAt;
 
   Task({
     required this.id,
@@ -67,11 +84,39 @@ class Task extends HiveObject {
     TaskRecurrenceType recurrenceType = TaskRecurrenceType.none,
     TaskPriority? taskPriority,
     this.deadline,
-    this.estimatedDurationMinutes,
+    int? estimatedDurationMinutes,
     List<String>? breakdownSteps,
+    List<String>? breakdownStepIds,
+    this.parentTaskId,
+    this.sourceStepId,
+    this.completedAt,
   }) : recurrenceTypeValue = recurrenceType.index,
        priorityLevelValue = (taskPriority ?? TaskPriority.medium).index,
-       breakdownSteps = breakdownSteps ?? [];
+       estimatedDurationMinutes = estimatedDurationMinutes ?? durationMinutes,
+       breakdownSteps = List.of(breakdownSteps ?? []),
+       breakdownStepIds = _initialStepIds(id, breakdownSteps, breakdownStepIds);
+
+  static final _stepRandom = Random.secure();
+
+  static String newBreakdownStepId() => List.generate(
+    16,
+    (_) => _stepRandom.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ).join();
+
+  static List<String> _initialStepIds(
+    String taskId,
+    List<String>? steps,
+    List<String>? ids,
+  ) {
+    // Old records have no IDs. Deterministic legacy IDs survive reopening even
+    // before the first edit; creating an action persists them with its parent.
+    return List.generate(
+      steps?.length ?? 0,
+      (i) => ids != null && i < ids.length
+          ? ids[i]
+          : 'legacy-step:${Uri.encodeComponent(taskId)}:$i',
+    );
+  }
 
   Color? get color => colorValue != null ? Color(colorValue!) : null;
   set color(Color? c) => colorValue = c?.toARGB32();
@@ -145,6 +190,13 @@ class Task extends HiveObject {
       breakdownSteps: (map['breakdownSteps'] as List<dynamic>? ?? [])
           .whereType<String>()
           .toList(),
+      breakdownStepIds: (map['breakdownStepIds'] as List<dynamic>?)
+          ?.cast<String>(),
+      parentTaskId: map['parentTaskId'] as String?,
+      sourceStepId: map['sourceStepId'] as String?,
+      completedAt: map['completedAt'] == null
+          ? null
+          : DateTime.tryParse(map['completedAt'] as String),
     );
   }
 
@@ -164,6 +216,10 @@ class Task extends HiveObject {
       'deadline': deadline?.toIso8601String(),
       'estimatedDurationMinutes': estimatedDurationMinutes,
       'breakdownSteps': breakdownSteps,
+      'breakdownStepIds': breakdownStepIds,
+      'parentTaskId': parentTaskId,
+      'sourceStepId': sourceStepId,
+      'completedAt': completedAt?.toUtc().toIso8601String(),
       'taskPriority': taskPriority.index,
     };
   }

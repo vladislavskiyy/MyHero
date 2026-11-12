@@ -205,6 +205,19 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<void> enterTextWithStorage(
+    WidgetTester tester,
+    Finder target,
+    String text,
+  ) async {
+    await tester.ensureVisible(target);
+    await tester.runAsync(() async {
+      await tester.enterText(target, text);
+      await Hive.box<Map>('analytics_events').flush();
+    });
+    await tester.pumpAndSettle();
+  }
+
   Future<void> confirmPlan(WidgetTester tester) async {
     final save = find.widgetWithText(ElevatedButton, 'Сохранить');
     await tester.ensureVisible(save);
@@ -236,8 +249,7 @@ void main() {
           find.widgetWithText(ElevatedButton, 'Сгенерировать план'),
         );
 
-        await tester.tap(find.byTooltip('Убрать из плана: Task A'));
-        await tester.pumpAndSettle();
+        await tapWithStorage(tester, find.byTooltip('Убрать из плана: Task A'));
         expect(find.text('Осталось: 30 мин'), findsOneWidget);
         await tester.tap(
           find.widgetWithText(OutlinedButton, 'Добавить задачу'),
@@ -245,10 +257,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('plan-add-b')), findsNothing);
         expect(find.byKey(const ValueKey('plan-add-future')), findsNothing);
-        await tester.tap(find.byKey(const ValueKey('plan-add-c')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Поднять: Task C'));
-        await tester.pumpAndSettle();
+        await tapWithStorage(tester, find.byKey(const ValueKey('plan-add-c')));
+        await tapWithStorage(tester, find.byTooltip('Поднять: Task C'));
         expect(appState.planDraftForDay(today)!['selectedTaskIds'], ['c', 'b']);
         expect(find.text('Осталось: 0 мин'), findsOneWidget);
         expect(appState.acceptedPlanForDay(today), isNull);
@@ -316,8 +326,7 @@ void main() {
       await showPage(tester, const SchedulerPage());
       await tester.tap(find.widgetWithText(OutlinedButton, 'Изменить план'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Убрать из плана: Task A'));
-      await tester.pumpAndSettle();
+      await tapWithStorage(tester, find.byTooltip('Убрать из плана: Task A'));
       await tester.tap(find.byKey(const ValueKey('plan-day-picker')));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -383,9 +392,12 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.tap(find.byTooltip('Убрать из плана: Task B'));
-      await tester.enterText(find.byKey(const ValueKey('plan-minutes')), '90');
-      await tester.pumpAndSettle();
+      await tapWithStorage(tester, find.byTooltip('Убрать из плана: Task B'));
+      await enterTextWithStorage(
+        tester,
+        find.byKey(const ValueKey('plan-minutes')),
+        '90',
+      );
       expect(appState.acceptedPlanForDay(today)!['availableMinutes'], 60);
       await confirmPlan(tester);
       expect(appState.acceptedPlanForDay(today)!['availableMinutes'], 90);
@@ -407,8 +419,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.tap(find.byTooltip('Убрать из плана: Task A'));
-      await tester.pumpAndSettle();
+      await tapWithStorage(tester, find.byTooltip('Убрать из плана: Task A'));
       await confirmPlan(tester);
       expect(appState.acceptedPlanForDay(today)!['selectedTaskIds'], isEmpty);
       expect(find.byKey(const ValueKey('working-task-b')), findsNothing);
@@ -434,8 +445,7 @@ void main() {
         tester,
         find.widgetWithText(ElevatedButton, 'Сгенерировать план'),
       );
-      await tester.tap(find.byTooltip('Поднять: Task B'));
-      await tester.pumpAndSettle();
+      await tapWithStorage(tester, find.byTooltip('Поднять: Task B'));
       expect(appState.planDraftForDay(today)!['selectedTaskIds'], ['b', 'a']);
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -469,9 +479,11 @@ void main() {
         tester,
         find.widgetWithText(ElevatedButton, 'Сгенерировать план'),
       );
-      await tester.ensureVisible(find.byKey(const ValueKey('plan-minutes')));
-      await tester.enterText(find.byKey(const ValueKey('plan-minutes')), '60');
-      await tester.pumpAndSettle();
+      await enterTextWithStorage(
+        tester,
+        find.byKey(const ValueKey('plan-minutes')),
+        '60',
+      );
       expect(find.text('Превышение: 30 мин'), findsOneWidget);
       expect(
         tester
@@ -481,9 +493,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      await tester.ensureVisible(find.byTooltip('Убрать из плана: Task A'));
-      await tester.tap(find.byTooltip('Убрать из плана: Task A'));
-      await tester.pumpAndSettle();
+      await tapWithStorage(tester, find.byTooltip('Убрать из плана: Task A'));
       expect(find.text('Осталось: 0 мин'), findsOneWidget);
       expect(
         tester
@@ -493,6 +503,167 @@ void main() {
             .onPressed,
         isNotNull,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'editable steps create one action that can be added through plan correction and completed',
+    (tester) async {
+      final today = DateUtils.dateOnly(DateTime.now());
+      final parent = Task(
+        id: 'project',
+        title: 'Большое дело',
+        estimatedDurationMinutes: 240,
+        breakdownSteps: ['Собрать материалы', 'Сделать слайды'],
+        breakdownStepIds: ['materials', 'slides'],
+      );
+      await tester.runAsync(() async {
+        await appState.addTaskToInbox(parent);
+        await appState.savePlanForDay(today, 60, plannedTasks: []);
+      });
+      await showPage(tester, const TodayPage());
+      tester.view.physicalSize = const Size(390, 844);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('other-tasks')));
+      await tester.tap(find.text('Остальные задачи (1)'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byTooltip('Редактировать'));
+      await tester.tap(find.byTooltip('Редактировать'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('breakdown-materials')),
+        'Собрать и проверить материалы',
+      );
+      await tester.ensureVisible(find.byTooltip('Удалить шаг 2'));
+      await tester.tap(find.byTooltip('Удалить шаг 2'));
+      await tester.tap(find.text('Добавить шаг'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        'Подготовить схему',
+      );
+      await tester.ensureVisible(find.text('Сохранить'));
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Сохранить'));
+        await Hive.box<TaskList>('task_lists').flush();
+      });
+      await tester.pumpAndSettle();
+      expect(parent.breakdownSteps, [
+        'Собрать и проверить материалы',
+        'Подготовить схему',
+      ]);
+      expect(parent.breakdownStepIds.first, 'materials');
+      expect(parent.breakdownStepIds.last, isNot('slides'));
+
+      final stepButton = find.byKey(const ValueKey('step-action-materials'));
+      await tester.ensureVisible(stepButton);
+      await tester.tap(stepButton);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('action-minutes')), findsOneWidget);
+      await tester.tap(find.text('Создать действие'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Введите длительность от 1 до 1440 минут.'),
+        findsOneWidget,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('action-minutes')),
+        '20',
+      );
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Создать действие'));
+        await Hive.box<TaskList>('task_lists').flush();
+      });
+      await tester.pumpAndSettle();
+      final action = appState.actionForStep(parent.id, 'materials')!;
+      expect(action.effectiveDurationMinutes, 20);
+      expect(appState.acceptedPlanForDay(today)!['selectedTaskIds'], isEmpty);
+
+      await tester.ensureVisible(stepButton);
+      await tester.tap(stepButton);
+      await tester.pumpAndSettle();
+      expect(find.text('Редактирование задачи'), findsOneWidget);
+      expect(find.byKey(const ValueKey('action-minutes')), findsNothing);
+      expect(appState.inboxList.tasks.length, 2);
+      await tester.tap(find.byTooltip('Закрыть'));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Изменить план'));
+      await tester.tap(find.text('Изменить план'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Добавить задачу'));
+      await tester.tap(find.text('Добавить задачу'));
+      await tester.pumpAndSettle();
+      await tapWithStorage(
+        tester,
+        find.byKey(ValueKey('plan-add-${action.id}')),
+      );
+      expect(appState.planDraftForDay(today)!['selectedTaskIds'], [action.id]);
+      expect(appState.acceptedPlanForDay(today)!['selectedTaskIds'], isEmpty);
+      await confirmPlan(tester);
+
+      final workingTile = find.byKey(ValueKey('working-task-${action.id}'));
+      final checkbox = find.descendant(
+        of: workingTile,
+        matching: find.byType(Checkbox),
+      );
+      await tester.ensureVisible(checkbox);
+      await tester.runAsync(() async {
+        await tester.tap(checkbox);
+        await Hive.box<TaskList>('task_lists').flush();
+        await Hive.box<Map>('analytics_events').flush();
+      });
+      await tester.pumpAndSettle();
+      expect(action.isDone, isTrue);
+      expect(parent.isDone, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'step edits stay local until saving and empty steps block saving',
+    (tester) async {
+      final parent = Task(
+        id: 'project',
+        title: 'Большое дело',
+        breakdownSteps: ['Собрать материалы'],
+        breakdownStepIds: ['materials'],
+      );
+      await tester.runAsync(() => appState.addTaskToInbox(parent));
+      await showPage(
+        tester,
+        Builder(
+          builder: (context) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () => showTaskDialog(context, task: parent),
+              child: const Text('Open task'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Open task'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('breakdown-materials')),
+        ' ',
+      );
+      await tester.ensureVisible(find.text('Сохранить'));
+      await tester.tap(find.text('Сохранить'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Не удалось сохранить задачу: Заполните или удалите пустые шаги.',
+        ),
+        findsOneWidget,
+      );
+      expect(parent.breakdownSteps, ['Собрать материалы']);
+      await tester.tap(find.byTooltip('Закрыть'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open task'));
+      await tester.pumpAndSettle();
+      expect(find.text('Собрать материалы'), findsOneWidget);
+      expect(parent.breakdownStepIds, ['materials']);
       expect(tester.takeException(), isNull);
     },
   );

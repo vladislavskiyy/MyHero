@@ -23,6 +23,12 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
   int? durationMinutes = task?.durationMinutes;
   final estimatedDurationMinutes = task?.estimatedDurationMinutes;
   final breakdownSteps = task?.breakdownSteps ?? <String>[];
+  final breakdownStepIds = task?.breakdownStepIds ?? <String>[];
+  final appState = context.read<AppState>();
+  final linkedStepIds = {
+    for (final id in breakdownStepIds)
+      if (task != null && appState.actionForStep(task.id, id) != null) id,
+  };
   int? priority = task?.priority;
   TaskRecurrenceType recurrenceType =
       task?.recurrenceType ?? TaskRecurrenceType.none;
@@ -45,6 +51,8 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
             initialDuration: durationMinutes,
             initialEstimatedDuration: estimatedDurationMinutes,
             initialBreakdownSteps: breakdownSteps,
+            initialBreakdownStepIds: breakdownStepIds,
+            linkedStepIds: linkedStepIds,
             initialPriority: priority,
             initialRecurrenceType: recurrenceType,
             onSave:
@@ -57,6 +65,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
                   required int? duration,
                   required int? estimatedDuration,
                   required List<String> breakdownSteps,
+                  required List<String> breakdownStepIds,
                   required int? priority,
                   required TaskRecurrenceType recurrenceType,
                 }) async {
@@ -77,6 +86,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
                       ..durationMinutes = duration
                       ..estimatedDurationMinutes = estimatedDuration
                       ..breakdownSteps = breakdownSteps
+                      ..breakdownStepIds = breakdownStepIds
                       ..priority = priority
                       ..recurrenceType = recurrenceType;
 
@@ -99,6 +109,7 @@ Future<void> showTaskDialog(BuildContext context, {Task? task}) async {
                         durationMinutes: duration,
                         estimatedDurationMinutes: estimatedDuration,
                         breakdownSteps: breakdownSteps,
+                        breakdownStepIds: breakdownStepIds,
                         priority: priority,
                         recurrenceType: recurrenceType,
                       ),
@@ -140,6 +151,8 @@ class _TaskSheet extends StatefulWidget {
   final int? initialDuration;
   final int? initialEstimatedDuration;
   final List<String> initialBreakdownSteps;
+  final List<String> initialBreakdownStepIds;
+  final Set<String> linkedStepIds;
   final int? initialPriority;
   final TaskRecurrenceType initialRecurrenceType;
 
@@ -152,6 +165,7 @@ class _TaskSheet extends StatefulWidget {
     required int? duration,
     required int? estimatedDuration,
     required List<String> breakdownSteps,
+    required List<String> breakdownStepIds,
     required int? priority,
     required TaskRecurrenceType recurrenceType,
   })
@@ -167,6 +181,8 @@ class _TaskSheet extends StatefulWidget {
     required this.initialDuration,
     required this.initialEstimatedDuration,
     required this.initialBreakdownSteps,
+    required this.initialBreakdownStepIds,
+    required this.linkedStepIds,
     required this.initialPriority,
     required this.initialRecurrenceType,
     required this.onSave,
@@ -184,6 +200,8 @@ class _TaskSheetState extends State<_TaskSheet> {
   late int? _duration = widget.initialDuration;
   late int? _estimatedDuration = widget.initialEstimatedDuration;
   late List<String> _breakdownSteps = List.of(widget.initialBreakdownSteps);
+  late List<String> _breakdownStepIds = List.of(widget.initialBreakdownStepIds);
+  late bool _hasBreakdown = widget.initialBreakdownSteps.isNotEmpty;
   late int? _priority = widget.initialPriority;
   late TaskRecurrenceType _recurrenceType = widget.initialRecurrenceType;
 
@@ -212,7 +230,30 @@ class _TaskSheetState extends State<_TaskSheet> {
       if (!mounted) return;
       setState(() {
         _estimatedDuration = suggestion.estimateMinutes;
-        _breakdownSteps = suggestion.steps;
+        _hasBreakdown = true;
+        final oldSteps = _breakdownSteps;
+        final oldIds = _breakdownStepIds;
+        final used = <int>{};
+        _breakdownSteps = [];
+        _breakdownStepIds = [];
+        for (final step in suggestion.steps) {
+          final index = oldSteps.asMap().keys.firstWhere(
+            (i) => !used.contains(i) && oldSteps[i].trim() == step.trim(),
+            orElse: () => -1,
+          );
+          _breakdownSteps.add(step);
+          _breakdownStepIds.add(
+            index < 0 ? Task.newBreakdownStepId() : oldIds[index],
+          );
+          if (index >= 0) used.add(index);
+        }
+        // Regeneration must not silently discard steps that already have actions.
+        for (var i = 0; i < oldSteps.length; i++) {
+          if (widget.linkedStepIds.contains(oldIds[i]) && !used.contains(i)) {
+            _breakdownSteps.add(oldSteps[i]);
+            _breakdownStepIds.add(oldIds[i]);
+          }
+        }
         _estimateRange =
             '${suggestion.minMinutes}–${suggestion.maxMinutes} мин';
         _estimateAssumptions = suggestion.assumptions;
@@ -302,7 +343,7 @@ class _TaskSheetState extends State<_TaskSheet> {
 
             const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: !isAiSupported || _isGeneratingSuggestion
+              onPressed: !isAiSupported || _isGeneratingSuggestion || _isSaving
                   ? null
                   : _generateSuggestion,
               icon: _isGeneratingSuggestion
@@ -327,7 +368,7 @@ class _TaskSheetState extends State<_TaskSheet> {
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
             ],
-            if (_estimatedDuration != null || _breakdownSteps.isNotEmpty) ...[
+            if (_estimatedDuration != null || _hasBreakdown) ...[
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -359,10 +400,66 @@ class _TaskSheetState extends State<_TaskSheet> {
                       const SizedBox(height: 6),
                       for (var i = 0; i < _breakdownSteps.length; i++)
                         Padding(
-                          padding: const EdgeInsets.only(top: 3),
-                          child: Text('${i + 1}. ${_breakdownSteps[i]}'),
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  key: ValueKey(
+                                    'breakdown-${_breakdownStepIds[i]}',
+                                  ),
+                                  initialValue: _breakdownSteps[i],
+                                  enabled:
+                                      !_isSaving && !_isGeneratingSuggestion,
+                                  minLines: 1,
+                                  maxLines: 3,
+                                  decoration: InputDecoration(
+                                    labelText: 'Шаг ${i + 1}',
+                                    helperText:
+                                        widget.linkedStepIds.contains(
+                                          _breakdownStepIds[i],
+                                        )
+                                        ? 'Действие уже создано'
+                                        : null,
+                                  ),
+                                  onChanged: (text) =>
+                                      _breakdownSteps[i] = text,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip:
+                                    widget.linkedStepIds.contains(
+                                      _breakdownStepIds[i],
+                                    )
+                                    ? 'Сначала удалите связанное действие'
+                                    : 'Удалить шаг ${i + 1}',
+                                onPressed:
+                                    _isSaving ||
+                                        _isGeneratingSuggestion ||
+                                        widget.linkedStepIds.contains(
+                                          _breakdownStepIds[i],
+                                        )
+                                    ? null
+                                    : () => setState(() {
+                                        _breakdownSteps.removeAt(i);
+                                        _breakdownStepIds.removeAt(i);
+                                      }),
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                            ],
+                          ),
                         ),
                     ],
+                    TextButton.icon(
+                      onPressed: _isSaving || _isGeneratingSuggestion
+                          ? null
+                          : () => setState(() {
+                              _breakdownSteps.add('');
+                              _breakdownStepIds.add(Task.newBreakdownStepId());
+                            }),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Добавить шаг'),
+                    ),
                     const SizedBox(height: 6),
                     const Text(
                       'Шаги и оценка сохранятся вместе с задачей. '
@@ -549,7 +646,7 @@ class _TaskSheetState extends State<_TaskSheet> {
               ),
             ],
             ElevatedButton.icon(
-              onPressed: _isSaving
+              onPressed: _isSaving || _isGeneratingSuggestion
                   ? null
                   : () async {
                       final title = widget.titleController.text.trim();
@@ -561,6 +658,14 @@ class _TaskSheetState extends State<_TaskSheet> {
                               content: Text('Введите название задачи'),
                             ),
                           );
+                        return;
+                      }
+
+                      if (_breakdownSteps.any((step) => step.trim().isEmpty)) {
+                        setState(
+                          () =>
+                              _saveError = 'Заполните или удалите пустые шаги.',
+                        );
                         return;
                       }
 
@@ -577,7 +682,10 @@ class _TaskSheetState extends State<_TaskSheet> {
                           color: _color,
                           duration: _duration,
                           estimatedDuration: _estimatedDuration,
-                          breakdownSteps: _breakdownSteps,
+                          breakdownSteps: _breakdownSteps
+                              .map((step) => step.trim())
+                              .toList(),
+                          breakdownStepIds: List.of(_breakdownStepIds),
                           priority: _priority,
                           recurrenceType: _recurrenceType,
                         );

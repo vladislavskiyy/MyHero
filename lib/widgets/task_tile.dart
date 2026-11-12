@@ -1,7 +1,10 @@
 // lib/widgets/task_tile.dart
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../dialogs/step_action_dialog.dart';
 import '../models/task.dart';
+import '../state/app_state.dart';
 import '../theme/app_theme.dart';
 
 class TaskTile extends StatelessWidget {
@@ -20,6 +23,10 @@ class TaskTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final parent = task.parentTaskId == null
+        ? null
+        : state.taskById(task.parentTaskId!);
     final stripeColor = (task.category?.isNotEmpty ?? false)
         ? task.color
         : AppColors.textMuted;
@@ -105,10 +112,25 @@ class TaskTile extends StatelessWidget {
                                       : null,
                                 ),
                               ),
-                              if (task.estimatedDurationMinutes != null) ...[
+                              if (task.parentTaskId != null) ...[
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Оценка: около ${task.estimatedDurationMinutes} мин',
+                                  parent == null
+                                      ? 'Исходное дело удалено'
+                                      : 'Действие для: ${parent.title}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                              ],
+                              if (task.estimatedDurationMinutes != null ||
+                                  task.durationMinutes != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Оценка: около ${task.effectiveDurationMinutes} мин',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
@@ -123,15 +145,7 @@ class TaskTile extends StatelessWidget {
                                   i < task.breakdownSteps.length;
                                   i++
                                 )
-                                  Text(
-                                    '${i + 1}. ${task.breakdownSteps[i]}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.textMuted,
-                                    ),
-                                  ),
+                                  _step(context, state, i),
                               ],
                               if (dateText != null) ...[
                                 const SizedBox(height: 4),
@@ -187,6 +201,44 @@ class TaskTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _step(BuildContext context, AppState state, int index) {
+    final stepId = task.breakdownStepIds[index];
+    final action = state.actionForStep(task.id, stepId);
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '${index + 1}. ${task.breakdownSteps[index]}'
+            '${action == null
+                ? ''
+                : action.isDone
+                ? ' · Выполнено'
+                : ' · Действие создано'}',
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+        ),
+        IconButton(
+          key: ValueKey('step-action-$stepId'),
+          tooltip: action == null
+              ? 'Создать действие: ${task.breakdownSteps[index]}'
+              : 'Открыть действие: ${action.title}',
+          icon: Icon(
+            action == null
+                ? Icons.add_task_rounded
+                : action.isDone
+                ? Icons.task_alt_rounded
+                : Icons.open_in_new_rounded,
+            size: 20,
+          ),
+          onPressed: () =>
+              showStepActionDialog(context, parent: task, stepId: stepId),
+        ),
+      ],
     );
   }
 }
